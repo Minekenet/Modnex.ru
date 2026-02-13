@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import * as ReactRouterDOM from 'react-router-dom';
 import { GAMES_DATA, DEFAULT_GAME_CONFIG } from '../constants';
@@ -65,7 +66,6 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
     return mods.filter(mod => {
       const matchesSearch = mod.name.toLowerCase().includes(searchMod.toLowerCase());
       
-      // Fix: Cast Object.entries(selectedFilters) to ensure selectedOptions is typed correctly as string[]
       const matchesFilters = (Object.entries(selectedFilters) as [string, string[]][]).every(([groupLabel, selectedOptions]) => {
         if (!selectedOptions || selectedOptions.length === 0) return true;
         return selectedOptions.includes(mod.attributes[groupLabel]);
@@ -118,15 +118,14 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
     return pages;
   };
 
-  // Определяем, является ли категория специфической (например, скины)
   const isSkinsCategory = activeCategory.toLowerCase().includes('skin') || activeCategory.toLowerCase().includes('скин');
 
   return (
-    <div className="min-h-screen bg-[#0b0b0c] text-white selection:bg-white selection:text-black font-['Inter',_sans-serif]">
+    <div className="min-h-screen bg-[#1c1c1f] text-white selection:bg-white selection:text-black font-['Inter',_sans-serif]">
       <div className="relative w-full overflow-hidden pt-6 pb-12">
         <div className="absolute inset-0 z-0">
           <img src={game.imageUrl} className="w-full h-full object-cover opacity-20 grayscale-[0.3] scale-105 blur-[2px]" alt="" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0b0b0c] via-[#0b0b0c]/40 to-transparent"></div>
+          <div className="absolute inset-0 bg-gradient-to-t from-[#1c1c1f] via-[#1c1c1f]/40 to-transparent"></div>
         </div>
         
         <div className="relative z-10 max-w-[1300px] mx-auto w-full px-8">
@@ -139,7 +138,7 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
           </nav>
 
           <div className="flex flex-col md:flex-row items-start gap-10">
-            <div className="w-40 h-56 shrink-0 overflow-hidden shadow-2xl rounded-lg bg-zinc-900 border border-white/5">
+            <div className="w-40 h-56 shrink-0 overflow-hidden shadow-2xl rounded-lg bg-[#27292e] border border-white/5">
               <img src={game.imageUrl} className="w-full h-full object-cover" alt={game.title} />
             </div>
             <div className="flex flex-col gap-6 pt-2">
@@ -190,7 +189,7 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
             );
 
             return (
-              <div key={i} className="bg-[#141416] rounded-xl overflow-hidden">
+              <div key={i} className="bg-[#27292e] rounded-xl overflow-hidden">
                 <button 
                   onClick={() => setCollapsedFilters(p => ({...p, [group.label]: !p[group.label]}))} 
                   className="w-full px-5 py-3.5 flex items-center justify-between bg-transparent border-none cursor-pointer text-left"
@@ -210,7 +209,7 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
                           value={searchTerm}
                           onChange={(e) => setFilterSearch(p => ({...p, [group.label]: e.target.value}))}
                           placeholder="Поиск..."
-                          className="w-full bg-[#0b0b0c] text-[13px] px-3 py-2 rounded-lg border-none text-zinc-300 placeholder:text-zinc-600 outline-none"
+                          className="w-full bg-[#1c1c1f] text-[13px] px-3 py-2 rounded-lg border-none text-zinc-300 placeholder:text-zinc-600 outline-none"
                         />
                       </div>
                     )}
@@ -225,7 +224,7 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
                                 onChange={() => toggleFilter(group.label, opt)}
                                 className="peer absolute inset-0 opacity-0 cursor-pointer z-10" 
                               />
-                              <div className="h-4 w-4 rounded bg-[#0b0b0c] peer-checked:bg-blue-500 transition-colors flex items-center justify-center">
+                              <div className="h-4 w-4 rounded bg-[#1c1c1f] peer-checked:bg-blue-500 transition-colors flex items-center justify-center">
                                 <svg className="w-2.5 h-2.5 text-white opacity-0 peer-checked:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7" />
                                 </svg>
@@ -250,7 +249,7 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
 
         <div className="lg:col-span-4 flex flex-col">
           <div className="mb-8 space-y-4">
-            <div className="relative w-full h-11 bg-[#1a1b23] rounded-lg px-4 flex items-center group transition-all">
+            <div className="relative w-full h-11 bg-[#27292e] rounded-lg px-4 flex items-center group transition-all">
               <svg className="w-4 h-4 text-zinc-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
               <input 
                 type="text" 
@@ -267,7 +266,7 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
                   <select 
                     value={sortBy} 
                     onChange={(e) => setSortBy(e.target.value)}
-                    className="appearance-none h-full bg-[#1a1b23] text-zinc-300 px-4 pr-10 rounded-lg text-[13px] font-bold border-none outline-none cursor-pointer hover:bg-[#23242d] transition-all"
+                    className="appearance-none h-full bg-[#27292e] text-zinc-300 px-4 pr-10 rounded-lg text-[13px] font-bold border-none outline-none cursor-pointer hover:bg-[#2d2f36] transition-all"
                   >
                     <option value="Relevance">Sort by: Relevance</option>
                     <option value="Newest">Sort by: Newest</option>
@@ -280,7 +279,7 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
                   <select 
                     value={perPage} 
                     onChange={(e) => setPerPage(e.target.value)}
-                    className="appearance-none h-full bg-[#1a1b23] text-zinc-300 px-4 pr-10 rounded-lg text-[13px] font-bold border-none outline-none cursor-pointer hover:bg-[#23242d] transition-all"
+                    className="appearance-none h-full bg-[#27292e] text-zinc-300 px-4 pr-10 rounded-lg text-[13px] font-bold border-none outline-none cursor-pointer hover:bg-[#2d2f36] transition-all"
                   >
                     <option value="20">View: 20</option>
                     <option value="40">View: 40</option>
@@ -291,7 +290,7 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
 
                 <button 
                   onClick={toggleViewMode}
-                  className="h-10 w-10 flex items-center justify-center bg-[#1a1b23] rounded-lg text-zinc-400 hover:text-white transition-all border-none cursor-pointer"
+                  className="h-10 w-10 flex items-center justify-center bg-[#27292e] rounded-lg text-zinc-400 hover:text-white transition-all border-none cursor-pointer"
                   title={`View: ${viewMode}`}
                 >
                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -348,9 +347,8 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
             {filteredMods.map((mod) => (
               <React.Fragment key={mod.id}>
                 {isSkinsCategory ? (
-                  /* Специальный макет для скинов */
-                  <div className="bg-[#141416] rounded-xl overflow-hidden flex flex-col group cursor-pointer border border-white/[0.03] transition-all hover:bg-white/[0.02]" onClick={() => navigate(`/game/${gameId}/mod/${mod.id}`)}>
-                    <div className="aspect-[2/3] relative overflow-hidden bg-zinc-900 flex items-center justify-center">
+                  <div className="bg-[#27292e] rounded-xl overflow-hidden flex flex-col group cursor-pointer border border-white/[0.03] transition-all hover:bg-white/[0.02]" onClick={() => navigate(`/game/${gameId}/mod/${mod.id}`)}>
+                    <div className="aspect-[2/3] relative overflow-hidden bg-[#1c1c1f] flex items-center justify-center">
                       <img src={`https://picsum.photos/seed/${mod.id}/400/600`} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt="" />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
                       <div className="absolute bottom-3 left-3 right-3">
@@ -360,28 +358,28 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
                     </div>
                   </div>
                 ) : viewMode === 'grid' ? (
-                  <div className="bg-[#141416] rounded-xl overflow-hidden flex flex-col group cursor-pointer border border-white/[0.03] transition-all" onClick={() => navigate(`/game/${gameId}/mod/${mod.id}`)}>
-                    <div className="aspect-[16/10] relative overflow-hidden bg-zinc-900">
+                  <div className="bg-[#27292e] rounded-xl overflow-hidden flex flex-col group cursor-pointer border border-white/[0.03] transition-all" onClick={() => navigate(`/game/${gameId}/mod/${mod.id}`)}>
+                    <div className="aspect-[16/10] relative overflow-hidden bg-[#1c1c1f]">
                       <img src={`https://picsum.photos/seed/${mod.id}/600/350`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" alt="" />
                     </div>
                     <div className="p-5 flex flex-col gap-2">
                       <h3 className="font-bold text-[15px] text-white line-clamp-2 leading-snug transition-colors group-hover:text-white">{mod.name}</h3>
                       <div className="flex flex-wrap gap-1.5 mt-1">
                         {Object.entries(mod.attributes).slice(0, 2).map(([key, val]) => (
-                          <span key={key} className="bg-[#0b0b0c] text-zinc-500 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-tight">
+                          <span key={key} className="bg-[#1c1c1f] text-zinc-500 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-tight">
                             {val}
                           </span>
                         ))}
                       </div>
                       <div className="flex items-center gap-2 mt-2">
-                         <div className="w-5 h-5 rounded-full overflow-hidden bg-zinc-800"><img src={`https://i.pravatar.cc/50?u=${mod.author}`} className="w-full h-full object-cover" alt="" /></div>
+                         <div className="w-5 h-5 rounded-full overflow-hidden bg-[#1c1c1f]"><img src={`https://i.pravatar.cc/50?u=${mod.author}`} className="w-full h-full object-cover" alt="" /></div>
                          <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-tight">{mod.author}</span>
                       </div>
                     </div>
                   </div>
                 ) : (
-                  <div className={`bg-[#141416] rounded-xl p-5 flex gap-5 group hover:bg-white/[0.03] transition-all cursor-pointer border border-white/[0.03] ${viewMode === 'compact' ? 'py-3' : ''}`} onClick={() => navigate(`/game/${gameId}/mod/${mod.id}`)}>
-                    <div className={`${viewMode === 'compact' ? 'w-16 h-16' : 'w-28 h-28'} shrink-0 rounded-lg overflow-hidden bg-zinc-800`}>
+                  <div className={`bg-[#27292e] rounded-xl p-5 flex gap-5 group hover:bg-white/[0.03] transition-all cursor-pointer border border-white/[0.03] ${viewMode === 'compact' ? 'py-3' : ''}`} onClick={() => navigate(`/game/${gameId}/mod/${mod.id}`)}>
+                    <div className={`${viewMode === 'compact' ? 'w-16 h-16' : 'w-28 h-28'} shrink-0 rounded-lg overflow-hidden bg-[#1c1c1f]`}>
                       <img src={`https://picsum.photos/seed/${mod.id}/300/300`} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt="" />
                     </div>
                     <div className="flex-grow flex flex-col justify-between py-0.5">
@@ -399,7 +397,7 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
                         <span className="flex items-center gap-1.5"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>{mod.size}</span>
                         <div className="flex gap-2">
                            {Object.values(mod.attributes).slice(0, 3).map((attr, idx) => (
-                             <span key={idx} className="text-zinc-800 bg-zinc-900 px-2 py-0.5 rounded-md text-[10px]">{attr}</span>
+                             <span key={idx} className="text-zinc-400 bg-[#1c1c1f] px-2 py-0.5 rounded-md text-[10px]">{attr}</span>
                            ))}
                         </div>
                       </div>
