@@ -8,8 +8,8 @@ interface SidebarBlockProps {
 
 const SidebarBlock: React.FC<SidebarBlockProps> = ({ title, children }) => {
   return (
-    <div className="bg-[#24262b] rounded-2xl p-6 border border-white/[0.03] shadow-lg">
-      <h3 className="text-white font-black text-[18px] uppercase tracking-tight mb-5">{title}</h3>
+    <div className="bg-[#24262b] rounded-2xl p-8 border border-white/5 shadow-lg">
+      <h3 className="text-white font-black text-[15px] uppercase tracking-tight mb-6">{title}</h3>
       <div className="space-y-4">
         {children}
       </div>

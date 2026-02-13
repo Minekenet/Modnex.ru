@@ -12,9 +12,11 @@ import SuggestModal from './components/SuggestModal';
 import InfoPage from './pages/InfoPage';
 import KnowledgeBasePage from './pages/KnowledgeBasePage';
 import CreateProjectPage from './pages/CreateProjectPage';
+import SupportChat from './components/SupportChat';
 
 const App: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [hasTicket, setHasTicket] = useState(false);
 
@@ -80,18 +82,27 @@ const App: React.FC = () => {
 
       <Footer />
       <SuggestModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <SupportChat isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
 
       {/* Плавающая кнопка чата поддержки */}
       {hasTicket && (
         <div className="fixed bottom-8 right-8 z-[90] animate-in fade-in slide-in-from-bottom-8 duration-500">
           <button 
-            onClick={() => alert('Чат поддержки будет доступен в следующем обновлении. Модератор скоро свяжется с вами!')}
-            className="w-16 h-16 bg-white text-zinc-950 rounded-full flex items-center justify-center shadow-[0_20px_50px_rgba(0,0,0,0.4)] hover:scale-110 transition-all border-none cursor-pointer relative"
+            onClick={() => setIsChatOpen(!isChatOpen)}
+            className={`w-16 h-16 rounded-full flex items-center justify-center shadow-[0_20px_50px_rgba(0,0,0,0.4)] hover:scale-110 transition-all border-none cursor-pointer relative ${
+              isChatOpen ? 'bg-blue-600 text-white' : 'bg-white text-zinc-950'
+            }`}
           >
-            <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-            </svg>
-            <div className="absolute top-0 right-0 w-5 h-5 bg-orange-500 border-4 border-[#1c1c1f] rounded-full animate-pulse"></div>
+            {isChatOpen ? (
+              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            ) : (
+              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+            )}
+            {!isChatOpen && <div className="absolute top-0 right-0 w-5 h-5 bg-blue-500 border-4 border-[#1c1c1f] rounded-full animate-pulse"></div>}
           </button>
         </div>
       )}

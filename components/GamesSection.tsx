@@ -84,7 +84,6 @@ const GamesSection: React.FC<GamesSectionProps> = ({ onSuggestClick, favorites, 
             )}
           </div>
         </div>
-        {/* Разделительная линия */}
         <div className="w-full h-[1px] bg-white/5"></div>
       </div>
       
@@ -116,7 +115,7 @@ const GamesSection: React.FC<GamesSectionProps> = ({ onSuggestClick, favorites, 
           
           <button 
             onClick={onSuggestClick}
-            className="shrink-0 flex items-center gap-4 px-10 py-5 bg-orange-500 text-zinc-950 font-black text-[13px] uppercase tracking-[0.2em] hover:bg-orange-400 transition-all border-none shadow-xl active:scale-95 cursor-pointer rounded-2xl group/btn"
+            className="shrink-0 flex items-center gap-4 px-10 py-5 bg-blue-600 text-white font-black text-[13px] uppercase tracking-[0.2em] hover:bg-blue-500 transition-all border-none shadow-xl active:scale-95 cursor-pointer rounded-2xl group/btn"
           >
             <span>Предложить игру</span>
             <svg className="w-5 h-5 transition-transform group-hover/btn:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
