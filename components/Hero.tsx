@@ -99,7 +99,7 @@ const Hero: React.FC = () => {
                 {filteredGames.length > 0 ? (
                   filteredGames.map((game) => (
                     <ReactRouterDOM.Link 
-                      to={`/game/${game.id}`}
+                      to={`/game/${game.slug}`}
                       key={game.id}
                       onClick={() => setIsSearchFocused(false)}
                       className="flex items-center gap-4 px-6 py-4 hover:bg-white/5 transition-colors group no-underline"

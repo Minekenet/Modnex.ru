@@ -56,8 +56,10 @@ const App: React.FC = () => {
           />
           <ReactRouterDOM.Route path="/auth" element={<AuthPage />} />
           <ReactRouterDOM.Route path="/profile" element={<ProfilePage />} />
+          
+          {/* SEO Optimized Routes */}
           <ReactRouterDOM.Route 
-            path="/game/:gameId" 
+            path="/game/:gameSlug" 
             element={
               <GamePage 
                 favorites={favorites} 
@@ -65,7 +67,16 @@ const App: React.FC = () => {
               />
             } 
           />
-          <ReactRouterDOM.Route path="/game/:gameId/mod/:modId" element={<ModDetailsPage />} />
+          <ReactRouterDOM.Route 
+            path="/game/:gameSlug/:categorySlug" 
+            element={
+              <GamePage 
+                favorites={favorites} 
+                onToggleFavorite={toggleFavorite} 
+              />
+            } 
+          />
+          <ReactRouterDOM.Route path="/game/:gameSlug/mod/:modId" element={<ModDetailsPage />} />
           
           <ReactRouterDOM.Route path="/privacy" element={<InfoPage type="privacy" />} />
           <ReactRouterDOM.Route path="/rules" element={<InfoPage type="rules" />} />

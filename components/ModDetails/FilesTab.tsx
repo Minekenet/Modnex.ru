@@ -133,14 +133,13 @@ const FilesTab: React.FC<FilesTabProps> = ({
         )}
       </div>
 
-      <div className="bg-[#0d0d0f] rounded-2xl border border-white/5 overflow-hidden shadow-2xl mt-8">
-        <div className="grid grid-cols-[48px_minmax(180px,1fr)_130px_90px_100px_120px_100px_40px] gap-2 px-8 py-6 bg-[#080809] border-b border-white/5 text-[13px] font-black uppercase tracking-widest text-zinc-500">
-          <span>Тип</span><span>Название</span><span>Загружен</span><span>Размер</span><span>Версия</span><span>Доп.</span><span>Загрузки</span><span></span>
+      <div className="bg-[#0d0d0f] rounded-2xl overflow-hidden shadow-2xl mt-8">
+        <div className="grid grid-cols-[minmax(180px,1fr)_130px_90px_100px_120px_100px_40px] gap-2 px-8 py-6 bg-[#080809] text-[13px] font-black uppercase tracking-widest text-zinc-500">
+          <span>Название</span><span>Загружен</span><span>Размер</span><span>Версия</span><span>Доп.</span><span>Загрузки</span><span></span>
         </div>
         <div className="divide-y divide-white/[0.02]">
           {currentFiles.map((file) => (
-            <div key={file.id} className="grid grid-cols-[48px_minmax(180px,1fr)_130px_90px_100px_120px_100px_40px] gap-2 px-8 py-5 items-center hover:bg-white/[0.02] transition-colors group">
-              <div className="w-6 h-6 bg-[#1a3a1c] text-[#4ade80] rounded-[4px] flex items-center justify-center text-[10px] font-black shadow-inner">{file.type}</div>
+            <div key={file.id} className="grid grid-cols-[minmax(180px,1fr)_130px_90px_100px_120px_100px_40px] gap-2 px-8 py-5 items-center hover:bg-white/[0.02] transition-colors group">
               <span className="text-[14px] font-bold text-zinc-300 group-hover:text-white transition-colors truncate block">{file.fileName}</span>
               <div className="text-[13px] font-medium text-zinc-500 whitespace-nowrap">{file.date}</div>
               <div className="text-[13px] font-medium text-zinc-500">{file.size}</div>

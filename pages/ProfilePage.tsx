@@ -242,7 +242,7 @@ const ProfilePage: React.FC = () => {
             <div className="flex flex-col md:flex-row items-end gap-10 -mt-36 mb-12">
               <div className="relative group shrink-0">
                 <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={(e) => handleFileSelect(e, 'avatar')} />
-                <div onClick={() => isOwnProfile && fileInputRef.current?.click()} className={`w-48 h-48 rounded-2xl border-[10px] border-[#24262b] overflow-hidden bg-[#1a1b23] shadow-2xl transition-all ${isOwnProfile ? 'cursor-pointer hover:brightness-110' : ''}`}>
+                <div onClick={() => isOwnProfile && fileInputRef.current?.click()} className={`w-48 h-48 rounded-full border-[10px] border-[#24262b] overflow-hidden bg-[#1a1b23] shadow-2xl transition-all ${isOwnProfile ? 'cursor-pointer hover:brightness-110' : ''}`}>
                   {profileData.avatarUrl ? (<img src={profileData.avatarUrl} className="w-full h-full object-cover" alt="" />) : (<div className="w-full h-full flex items-center justify-center text-zinc-800"><svg className="w-24 h-24" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" /></svg></div>)}
                 </div>
               </div>
@@ -323,12 +323,12 @@ const ProfilePage: React.FC = () => {
 
                 {/* Selection Box (Hole) */}
                 <div 
-                  className="absolute cursor-move border-[4px] border-[#3b82f6] box-border shadow-[0_0_0_2px_rgba(0,0,0,0.6)] z-20" 
+                  className={`absolute cursor-move border-[4px] border-[#3b82f6] box-border shadow-[0_0_0_2px_rgba(0,0,0,0.6)] z-20 ${cropType === 'avatar' ? 'rounded-full' : ''}`} 
                   style={{ top: `${cropBox.y}%`, left: `${cropBox.x}%`, width: `${cropBox.width}%`, height: `${cropBox.height}%` }} 
                   onMouseDown={(e) => handleMouseDown(e, 'move')}
                 >
                   {/* Visual content hole */}
-                  <div className="w-full h-full overflow-hidden pointer-events-none relative">
+                  <div className={`w-full h-full overflow-hidden pointer-events-none relative ${cropType === 'avatar' ? 'rounded-full' : ''}`}>
                     <img 
                       src={tempImageUrl} 
                       className="absolute max-w-none" 
@@ -340,9 +340,6 @@ const ProfilePage: React.FC = () => {
                       }} 
                       alt="" 
                     />
-                    {cropType === 'avatar' && (
-                      <div className="absolute inset-0 border-[3px] border-[#3b82f6]/40 rounded-full pointer-events-none"></div>
-                    )}
                   </div>
 
                   {/* Corner Handles - Sharp White Squares with Blue Border */}

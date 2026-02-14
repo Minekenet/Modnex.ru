@@ -4,6 +4,7 @@ import { Game } from './types';
 export const GAMES_DATA: Game[] = [
   { 
     id: '1', 
+    slug: 'minecraft',
     title: 'Minecraft', 
     imageUrl: 'https://hot.game/uploads/media/game/0002/50/thumb_149421_game_poster2.jpeg', 
     modCount: '253.6K', 
@@ -29,6 +30,7 @@ export const GAMES_DATA: Game[] = [
   },
   { 
     id: '2', 
+    slug: 'path-of-exile-2',
     title: 'Path of Exile 2', 
     imageUrl: 'https://picsum.photos/seed/poe2_poster/400/600', 
     modCount: '12.4K', 
@@ -38,6 +40,7 @@ export const GAMES_DATA: Game[] = [
   },
   { 
     id: '3', 
+    slug: 'efootball-2025',
     title: 'eFootball 2025', 
     imageUrl: 'https://picsum.photos/seed/efootball/400/600', 
     modCount: '5.2K', 
@@ -47,6 +50,7 @@ export const GAMES_DATA: Game[] = [
   },
   { 
     id: '4', 
+    slug: 'world-of-warcraft',
     title: 'World of Warcraft', 
     imageUrl: 'https://picsum.photos/seed/wow_poster/400/600', 
     modCount: '85.1K', 
@@ -56,6 +60,7 @@ export const GAMES_DATA: Game[] = [
   },
   { 
     id: '5', 
+    slug: 'cyberpunk-2077',
     title: 'Cyberpunk 2077', 
     imageUrl: 'https://picsum.photos/seed/cp2077/400/600', 
     modCount: '64.2K', 
@@ -65,6 +70,7 @@ export const GAMES_DATA: Game[] = [
   },
   { 
     id: '6', 
+    slug: 'the-witcher-3',
     title: 'The Witcher 3', 
     imageUrl: 'https://picsum.photos/seed/witcher/400/600', 
     modCount: '45.1K', 
@@ -79,6 +85,7 @@ export const GAMES_DATA: Game[] = [
   },
   { 
     id: '7', 
+    slug: 'stardew-valley',
     title: 'Stardew Valley', 
     imageUrl: 'https://picsum.photos/seed/stardew/400/600', 
     modCount: '18.9K', 
@@ -88,6 +95,7 @@ export const GAMES_DATA: Game[] = [
   },
   { 
     id: '8', 
+    slug: 'skyrim-se',
     title: 'Skyrim Special Edition', 
     imageUrl: 'https://picsum.photos/seed/skyrim/400/600', 
     modCount: '125.2K', 
@@ -102,6 +110,7 @@ export const GAMES_DATA: Game[] = [
   },
   { 
     id: '9', 
+    slug: 'gta-v',
     title: 'Grand Theft Auto V', 
     imageUrl: 'https://picsum.photos/seed/gtav/400/600', 
     modCount: '92.4K', 
@@ -111,6 +120,7 @@ export const GAMES_DATA: Game[] = [
   },
   { 
     id: '10', 
+    slug: 'terraria',
     title: 'Terraria', 
     imageUrl: 'https://picsum.photos/seed/terraria/400/600', 
     modCount: '22.4K', 
@@ -124,6 +134,7 @@ export const GAMES_DATA: Game[] = [
   },
   { 
     id: '11', 
+    slug: 'rust',
     title: 'Rust', 
     imageUrl: 'https://picsum.photos/seed/rust_game/400/600', 
     modCount: '8.1K', 
@@ -133,6 +144,7 @@ export const GAMES_DATA: Game[] = [
   },
   { 
     id: '12', 
+    slug: 'pubg',
     title: 'PUBG', 
     imageUrl: 'https://picsum.photos/seed/pubg_game/400/600', 
     modCount: '3.4K', 

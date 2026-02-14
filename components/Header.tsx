@@ -28,9 +28,10 @@ const Header: React.FC = () => {
   const [gameSearch, setGameSearch] = useState('');
   const timeoutRef = useRef<number | null>(null);
 
-  // Используем GAMES_DATA для консистентности ссылок
+  // Используем slug для ссылок
   const navGames = GAMES_DATA.map(game => ({
     id: game.id,
+    slug: game.slug,
     name: game.title,
     icon: game.imageUrl
   }));
@@ -135,7 +136,7 @@ const Header: React.FC = () => {
                     <div className="grid grid-cols-6 gap-x-4 gap-y-8 max-h-[400px] overflow-y-auto no-scrollbar min-h-[100px]">
                       {navGames.filter(g => g.name.toLowerCase().includes(gameSearch.toLowerCase())).map((game, idx) => (
                         <ReactRouterDOM.Link 
-                          to={`/game/${game.id}`} 
+                          to={`/game/${game.slug}`} 
                           key={idx} 
                           onClick={() => setActiveMenu(null)}
                           className="flex flex-col items-center gap-3 cursor-pointer text-center w-full group no-underline"

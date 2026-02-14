@@ -6,6 +6,7 @@ export interface FilterOption {
 
 export interface Game {
   id: string;
+  slug: string;
   title: string;
   imageUrl: string;
   modCount: string;

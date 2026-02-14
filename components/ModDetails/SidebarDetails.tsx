@@ -10,7 +10,7 @@ const SidebarDetails: React.FC = () => {
   ];
 
   return (
-    <div className="bg-[#24262b] rounded-3xl p-10 border border-white/5 shadow-xl space-y-8">
+    <div className="bg-[#24262b] rounded-3xl p-10 shadow-xl space-y-8">
       <h4 className="text-[12px] font-black text-zinc-600 uppercase tracking-[0.3em] mb-8">Детали</h4>
       <div className="space-y-5">
         {details.map((d, i) => (

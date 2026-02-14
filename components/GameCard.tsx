@@ -41,7 +41,7 @@ const GameCard: React.FC<GameCardProps> = ({ game, isFavorite, onToggleFavorite 
   };
 
   const handleCardClick = () => {
-    navigate(`/game/${game.id}`);
+    navigate(`/game/${game.slug}`);
   };
 
   return (

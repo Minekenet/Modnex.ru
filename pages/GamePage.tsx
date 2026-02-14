@@ -11,14 +11,26 @@ interface GamePageProps {
 type ViewMode = 'grid' | 'compact' | 'list';
 
 const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
-  const { gameId } = ReactRouterDOM.useParams();
+  const { gameSlug, categorySlug } = ReactRouterDOM.useParams();
   const navigate = ReactRouterDOM.useNavigate();
   
-  const game = GAMES_DATA.find(g => g.id === gameId) || GAMES_DATA[0];
+  const game = useMemo(() => {
+    return GAMES_DATA.find(g => g.slug === gameSlug) || GAMES_DATA[0];
+  }, [gameSlug]);
+
   const categories = game.categories || DEFAULT_GAME_CONFIG.categories;
   const filterGroups = game.filters || DEFAULT_GAME_CONFIG.filters;
 
-  const [activeCategory, setActiveCategory] = useState(categories[0]);
+  // Helper to slugify category name
+  const slugify = (text: string) => text.toLowerCase().replace(/\s+/g, '-');
+
+  // Derive active category from URL or default
+  const activeCategory = useMemo(() => {
+    if (!categorySlug) return categories[0];
+    const found = categories.find(c => slugify(c) === categorySlug);
+    return found || categories[0];
+  }, [categorySlug, categories]);
+
   const [searchMod, setSearchMod] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [sortBy, setSortBy] = useState('Relevance');
@@ -33,14 +45,13 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
 
   // Сброс при смене игры или категории
   useEffect(() => {
-    setActiveCategory(categories[0]);
     setCurrentPage(1);
     setSelectedFilters({});
     setFilterSearch({});
     window.scrollTo(0, 0);
-  }, [gameId]);
+  }, [gameSlug, categorySlug]);
 
-  // Генерация модов с атрибутами, соответствующими фильтрам игры
+  // Генерация модов
   const mods = useMemo(() => {
     return Array.from({ length: 40 }, (_, i) => {
       const attributes: Record<string, string> = {};
@@ -59,18 +70,15 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
         attributes
       };
     });
-  }, [gameId, currentPage, filterGroups, activeCategory]);
+  }, [game.id, currentPage, filterGroups, activeCategory]);
 
-  // Логика фильтрации
   const filteredMods = useMemo(() => {
     return mods.filter(mod => {
       const matchesSearch = mod.name.toLowerCase().includes(searchMod.toLowerCase());
-      
       const matchesFilters = (Object.entries(selectedFilters) as [string, string[]][]).every(([groupLabel, selectedOptions]) => {
         if (!selectedOptions || selectedOptions.length === 0) return true;
         return selectedOptions.includes(mod.attributes[groupLabel]);
       });
-
       return matchesSearch && matchesFilters;
     });
   }, [mods, searchMod, selectedFilters]);
@@ -78,9 +86,7 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
   const toggleFilter = (groupLabel: string, option: string) => {
     setSelectedFilters(prev => {
       const current = prev[groupLabel] || [];
-      const next = current.includes(option)
-        ? current.filter(o => o !== option)
-        : [...current, option];
+      const next = current.includes(option) ? current.filter(o => o !== option) : [...current, option];
       return { ...prev, [groupLabel]: next };
     });
   };
@@ -93,11 +99,7 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
   };
 
   const toggleViewMode = () => {
-    setViewMode(prev => {
-      if (prev === 'grid') return 'compact';
-      if (prev === 'compact') return 'list';
-      return 'grid';
-    });
+    setViewMode(prev => (prev === 'grid' ? 'compact' : prev === 'compact' ? 'list' : 'grid'));
   };
 
   const getViewModeIcon = () => {
@@ -132,7 +134,7 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
           <nav className="flex items-center gap-2 text-[14px] font-medium text-zinc-500 mb-8">
             <ReactRouterDOM.Link to="/" className="hover:text-white transition-colors no-underline">Home</ReactRouterDOM.Link>
             <svg className="w-3 h-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M9 5l7 7-7 7" /></svg>
-            <span className="text-zinc-500">{game.title}</span>
+            <ReactRouterDOM.Link to={`/game/${game.slug}`} className="hover:text-white transition-colors no-underline">{game.title}</ReactRouterDOM.Link>
             <svg className="w-3 h-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M9 5l7 7-7 7" /></svg>
             <span className="text-white">{activeCategory}</span>
           </nav>
@@ -169,15 +171,15 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
         <div className="hidden lg:block space-y-4">
           <div className="mb-6 flex flex-wrap gap-1.5">
             {categories.map((cat) => (
-              <button
+              <ReactRouterDOM.Link
                 key={cat}
-                onClick={() => setActiveCategory(cat)}
-                className={`px-3 py-1.5 text-[14px] font-bold transition-all border-none cursor-pointer rounded-md ${
+                to={`/game/${game.slug}/${slugify(cat)}`}
+                className={`px-3 py-1.5 text-[14px] font-bold transition-all border-none cursor-pointer rounded-md no-underline ${
                   activeCategory === cat ? 'bg-white/10 text-white' : 'text-zinc-500 hover:text-white hover:bg-white/5'
                 }`}
               >
                 {cat}
-              </button>
+              </ReactRouterDOM.Link>
             ))}
           </div>
 
@@ -216,7 +218,7 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
                     <div className="relative">
                       <div className={`space-y-2 ${hasManyOptions ? 'max-h-60 overflow-y-auto no-scrollbar pr-1' : ''}`}>
                         {filteredOptions.map(opt => (
-                          <label key={opt} className="flex items-center gap-3 cursor-pointer group py-0.5" onClick={(e) => e.stopPropagation()}>
+                          <label key={opt} className="flex items-center gap-3 cursor-pointer group py-0.5">
                             <div className="relative flex items-center h-4 w-4 shrink-0">
                               <input 
                                 type="checkbox" 
@@ -235,9 +237,6 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
                             </span>
                           </label>
                         ))}
-                        {filteredOptions.length === 0 && (
-                          <span className="text-[12px] text-zinc-700 italic">Ничего не найдено</span>
-                        )}
                       </div>
                     </div>
                   </div>
@@ -262,40 +261,20 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
 
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="relative h-10 group">
-                  <select 
-                    value={sortBy} 
-                    onChange={(e) => setSortBy(e.target.value)}
-                    className="appearance-none h-full bg-[#27292e] text-zinc-300 px-4 pr-10 rounded-lg text-[13px] font-bold border-none outline-none cursor-pointer hover:bg-[#2d2f36] transition-all"
-                  >
-                    <option value="Relevance">Sort by: Relevance</option>
-                    <option value="Newest">Sort by: Newest</option>
-                    <option value="Popularity">Sort by: Popularity</option>
-                  </select>
-                  <svg className="absolute right-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
-                </div>
-
-                <div className="relative h-10 group">
-                  <select 
-                    value={perPage} 
-                    onChange={(e) => setPerPage(e.target.value)}
-                    className="appearance-none h-full bg-[#27292e] text-zinc-300 px-4 pr-10 rounded-lg text-[13px] font-bold border-none outline-none cursor-pointer hover:bg-[#2d2f36] transition-all"
-                  >
-                    <option value="20">View: 20</option>
-                    <option value="40">View: 40</option>
-                    <option value="60">View: 60</option>
-                  </select>
-                  <svg className="absolute right-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
-                </div>
-
+                <select 
+                  value={sortBy} 
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="bg-[#27292e] text-zinc-300 px-4 py-2 rounded-lg text-[13px] font-bold border-none outline-none cursor-pointer"
+                >
+                  <option value="Relevance">Sort by: Relevance</option>
+                  <option value="Newest">Sort by: Newest</option>
+                  <option value="Popularity">Sort by: Popularity</option>
+                </select>
                 <button 
                   onClick={toggleViewMode}
                   className="h-10 w-10 flex items-center justify-center bg-[#27292e] rounded-lg text-zinc-400 hover:text-white transition-all border-none cursor-pointer"
-                  title={`View: ${viewMode}`}
                 >
-                   <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                     {getViewModeIcon()}
-                   </svg>
+                   <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">{getViewModeIcon()}</svg>
                 </button>
               </div>
 
@@ -309,21 +288,15 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
                 </button>
                 <div className="flex items-center gap-1.5">
                   {getPageNumbers().map((n, i) => (
-                    n === '...' ? (
-                      <span key={`dots-${i}`} className="text-zinc-700 font-bold px-1">...</span>
-                    ) : (
-                      <button 
-                        key={`top-page-${n}`}
-                        onClick={() => handlePageChange(n)}
-                        className={`text-[15px] font-bold transition-all bg-transparent border-none cursor-pointer flex items-center justify-center min-w-[28px] min-h-[28px] ${
-                          currentPage === n 
-                          ? 'text-white underline underline-offset-4' 
-                          : 'text-zinc-500 hover:text-white'
-                        }`}
-                      >
-                        {n}
-                      </button>
-                    )
+                    <button 
+                      key={i}
+                      onClick={() => typeof n === 'number' && handlePageChange(n)}
+                      className={`text-[15px] font-bold transition-all bg-transparent border-none cursor-pointer flex items-center justify-center min-w-[28px] ${
+                        currentPage === n ? 'text-white underline underline-offset-4' : 'text-zinc-500 hover:text-white'
+                      }`}
+                    >
+                      {n}
+                    </button>
                   ))}
                 </div>
                 <button 
@@ -345,66 +318,33 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
               : 'grid-cols-1'
           }`}>
             {filteredMods.map((mod) => (
-              <React.Fragment key={mod.id}>
-                {isSkinsCategory ? (
-                  <div className="bg-[#27292e] rounded-xl overflow-hidden flex flex-col group cursor-pointer border border-white/[0.03] transition-all hover:bg-white/[0.02]" onClick={() => navigate(`/game/${gameId}/mod/${mod.id}`)}>
-                    <div className="aspect-[2/3] relative overflow-hidden bg-[#1c1c1f] flex items-center justify-center">
-                      <img src={`https://picsum.photos/seed/${mod.id}/400/600`} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt="" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                      <div className="absolute bottom-3 left-3 right-3">
-                         <h3 className="font-bold text-[13px] text-white truncate">{mod.name}</h3>
-                         <span className="text-[10px] text-zinc-400">By {mod.author}</span>
-                      </div>
+              <div 
+                key={mod.id} 
+                className="bg-[#27292e] rounded-xl overflow-hidden flex flex-col group cursor-pointer border border-white/[0.03] transition-all hover:bg-white/[0.02]" 
+                onClick={() => navigate(`/game/${game.slug}/mod/${mod.id}`)}
+              >
+                <div className={`${isSkinsCategory ? 'aspect-[2/3]' : 'aspect-video'} relative overflow-hidden bg-[#1c1c1f]`}>
+                  <img src={`https://picsum.photos/seed/${mod.id}/${isSkinsCategory ? '400/600' : '600/350'}`} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt="" />
+                  {isSkinsCategory && (
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                  )}
+                  {isSkinsCategory && (
+                    <div className="absolute bottom-3 left-3 right-3">
+                       <h3 className="font-bold text-[13px] text-white truncate">{mod.name}</h3>
+                       <span className="text-[10px] text-zinc-400">By {mod.author}</span>
                     </div>
-                  </div>
-                ) : viewMode === 'grid' ? (
-                  <div className="bg-[#27292e] rounded-xl overflow-hidden flex flex-col group cursor-pointer border border-white/[0.03] transition-all" onClick={() => navigate(`/game/${gameId}/mod/${mod.id}`)}>
-                    <div className="aspect-[16/10] relative overflow-hidden bg-[#1c1c1f]">
-                      <img src={`https://picsum.photos/seed/${mod.id}/600/350`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" alt="" />
-                    </div>
-                    <div className="p-5 flex flex-col gap-2">
-                      <h3 className="font-bold text-[15px] text-white line-clamp-2 leading-snug transition-colors group-hover:text-white">{mod.name}</h3>
-                      <div className="flex flex-wrap gap-1.5 mt-1">
-                        {Object.entries(mod.attributes).slice(0, 2).map(([key, val]) => (
-                          <span key={key} className="bg-[#1c1c1f] text-zinc-500 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-tight">
-                            {val}
-                          </span>
-                        ))}
-                      </div>
-                      <div className="flex items-center gap-2 mt-2">
-                         <div className="w-5 h-5 rounded-full overflow-hidden bg-[#1c1c1f]"><img src={`https://i.pravatar.cc/50?u=${mod.author}`} className="w-full h-full object-cover" alt="" /></div>
-                         <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-tight">{mod.author}</span>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className={`bg-[#27292e] rounded-xl p-5 flex gap-5 group hover:bg-white/[0.03] transition-all cursor-pointer border border-white/[0.03] ${viewMode === 'compact' ? 'py-3' : ''}`} onClick={() => navigate(`/game/${gameId}/mod/${mod.id}`)}>
-                    <div className={`${viewMode === 'compact' ? 'w-16 h-16' : 'w-28 h-28'} shrink-0 rounded-lg overflow-hidden bg-[#1c1c1f]`}>
-                      <img src={`https://picsum.photos/seed/${mod.id}/300/300`} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt="" />
-                    </div>
-                    <div className="flex-grow flex flex-col justify-between py-0.5">
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2">
-                          <h3 className={`${viewMode === 'compact' ? 'text-[15px]' : 'text-[17px]'} font-bold text-white group-hover:text-white transition-colors tracking-tight`}>{mod.name}</h3>
-                          <span className="text-zinc-700 text-lg font-light mx-0.5">|</span>
-                          <span className="text-zinc-500 text-[13px] font-medium">By {mod.author}</span>
-                        </div>
-                        {viewMode === 'list' && <p className="text-zinc-600 text-[13px] font-medium line-clamp-2 leading-relaxed">{mod.desc}</p>}
-                      </div>
-                      <div className={`flex items-center gap-5 ${viewMode === 'compact' ? 'mt-1' : 'mt-3'} text-[12px] font-bold text-zinc-600`}>
-                        <span className="flex items-center gap-1.5"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>{mod.downloads}</span>
-                        <span className="flex items-center gap-1.5"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>{mod.relativeDate}</span>
-                        <span className="flex items-center gap-1.5"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>{mod.size}</span>
-                        <div className="flex gap-2">
-                           {Object.values(mod.attributes).slice(0, 3).map((attr, idx) => (
-                             <span key={idx} className="text-zinc-400 bg-[#1c1c1f] px-2 py-0.5 rounded-md text-[10px]">{attr}</span>
-                           ))}
-                        </div>
-                      </div>
+                  )}
+                </div>
+                {!isSkinsCategory && (
+                  <div className="p-5 flex flex-col gap-2">
+                    <h3 className="font-bold text-[15px] text-white line-clamp-2 leading-snug">{mod.name}</h3>
+                    <div className="flex items-center gap-2 mt-2">
+                       <div className="w-5 h-5 rounded-full overflow-hidden bg-[#1c1c1f]"><img src={`https://i.pravatar.cc/50?u=${mod.author}`} className="w-full h-full object-cover" alt="" /></div>
+                       <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-tight">{mod.author}</span>
                     </div>
                   </div>
                 )}
-              </React.Fragment>
+              </div>
             ))}
           </div>
 
@@ -416,27 +356,19 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15 19l-7-7 7-7" /></svg>
             </button>
-            
             <div className="flex items-center gap-5">
               {getPageNumbers().map((n, i) => (
-                n === '...' ? (
-                  <span key={`dots-bottom-${i}`} className="text-zinc-700 font-bold text-lg px-2">...</span>
-                ) : (
-                  <button 
-                    key={`bottom-page-${n}`}
-                    onClick={() => handlePageChange(n)}
-                    className={`text-[16px] font-bold border-none bg-transparent cursor-pointer transition-all flex items-center justify-center ${
-                      currentPage === n 
-                      ? 'text-white underline underline-offset-8' 
-                      : 'text-zinc-600 hover:text-white'
-                    }`}
-                  >
-                    {n}
-                  </button>
-                )
+                <button 
+                  key={i}
+                  onClick={() => typeof n === 'number' && handlePageChange(n)}
+                  className={`text-[16px] font-bold border-none bg-transparent cursor-pointer transition-all ${
+                    currentPage === n ? 'text-white underline underline-offset-8' : 'text-zinc-600 hover:text-white'
+                  }`}
+                >
+                  {n}
+                </button>
               ))}
             </div>
-
             <button 
               disabled={currentPage === totalPages}
               onClick={() => handlePageChange(currentPage + 1)}
