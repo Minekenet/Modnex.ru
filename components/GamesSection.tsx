@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import GameCard from './GameCard';
 import { GAMES_DATA } from '../constants';
+import { gamesService } from '../api/games';
 
 interface GamesSectionProps {
   onSuggestClick: () => void;
@@ -13,28 +14,45 @@ const GamesSection: React.FC<GamesSectionProps> = ({ onSuggestClick, favorites, 
   const [sortBy, setSortBy] = useState('ПОПУЛЯРНЫЕ');
   const [isSortOpen, setIsSortOpen] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
-  
+  const [games, setGames] = useState<any[]>(GAMES_DATA);
+
   const sortOptions = ['ПОПУЛЯРНЫЕ', 'КОЛИЧЕСТВО МОДОВ', 'ИЗБРАННЫЕ'];
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (sortRef.current && !sortRef.current.contains(event.target as Node)) {
-        setIsSortOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const parseCount = (countStr: string) => {
-    const multiplier = countStr.endsWith('B') ? 1000000000 : 
-                       countStr.endsWith('M') ? 1000000 : 
-                       countStr.endsWith('K') ? 1000 : 1;
-    return parseFloat(countStr) * multiplier;
+  const parseCount = (count: any) => {
+    if (typeof count === 'number') return count;
+    if (typeof count !== 'string') return 0;
+    const multiplier = count.endsWith('B') ? 1000000000 :
+      count.endsWith('M') ? 1000000 :
+        count.endsWith('K') ? 1000 : 1;
+    return parseFloat(count) * multiplier;
   };
 
+  useEffect(() => {
+    const fetchGames = async () => {
+      try {
+        const data = await gamesService.getAll();
+        if (Array.isArray(data) && data.length > 0) {
+          const mapped = data.map(g => {
+            const local = GAMES_DATA.find(l => l.slug === g.slug);
+            const stats = typeof g.stats === 'string' ? JSON.parse(g.stats) : (g.stats || {});
+            return {
+              ...g,
+              imageUrl: g.cover_url || local?.imageUrl || '',
+              modCount: stats.modCount || local?.modCount || '0',
+              downloadCount: stats.downloads || local?.downloadCount || '0'
+            };
+          });
+          setGames(mapped);
+        }
+      } catch (err) {
+        console.warn('API fetch failed, using local data', err);
+      }
+    };
+    fetchGames();
+  }, []);
+
   const displayedGames = useMemo(() => {
-    let sorted = [...GAMES_DATA];
+    let sorted = [...games];
     if (sortBy === 'ПОПУЛЯРНЫЕ') {
       sorted.sort((a, b) => parseCount(b.downloadCount) - parseCount(a.downloadCount));
     } else if (sortBy === 'КОЛИЧЕСТВО МОДОВ') {
@@ -45,7 +63,7 @@ const GamesSection: React.FC<GamesSectionProps> = ({ onSuggestClick, favorites, 
       sorted = [...favorited, ...notFavorited];
     }
     return sorted.slice(0, 10);
-  }, [sortBy, favorites]);
+  }, [sortBy, favorites, games]);
 
   return (
     <section className="max-w-[1400px] mx-auto px-8 pt-4 pb-16 font-['Inter',_sans-serif]">
@@ -57,7 +75,7 @@ const GamesSection: React.FC<GamesSectionProps> = ({ onSuggestClick, favorites, 
           </div>
 
           <div className="relative" ref={sortRef}>
-            <button 
+            <button
               onClick={() => setIsSortOpen(!isSortOpen)}
               className="flex items-center gap-4 px-6 py-2.5 bg-[#2f3131] rounded-xl border-none text-[13px] font-bold text-zinc-300 hover:bg-[#3f4141] transition-all cursor-pointer outline-none shadow-lg"
             >
@@ -73,9 +91,8 @@ const GamesSection: React.FC<GamesSectionProps> = ({ onSuggestClick, favorites, 
                   <button
                     key={opt}
                     onClick={() => { setSortBy(opt); setIsSortOpen(false); }}
-                    className={`w-full text-left px-5 py-3 text-[11px] font-bold uppercase tracking-widest transition-colors border-none bg-transparent cursor-pointer ${
-                      sortBy === opt ? 'text-white bg-white/10' : 'text-zinc-400 hover:text-white hover:bg-white/5'
-                    }`}
+                    className={`w-full text-left px-5 py-3 text-[11px] font-bold uppercase tracking-widest transition-colors border-none bg-transparent cursor-pointer ${sortBy === opt ? 'text-white bg-white/10' : 'text-zinc-400 hover:text-white hover:bg-white/5'
+                      }`}
                   >
                     {opt}
                   </button>
@@ -86,18 +103,18 @@ const GamesSection: React.FC<GamesSectionProps> = ({ onSuggestClick, favorites, 
         </div>
         <div className="w-full h-[1px] bg-white/5"></div>
       </div>
-      
+
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-6 gap-y-12 mb-20 min-h-[300px] mt-12">
         {displayedGames.map((game) => (
-          <GameCard 
-            key={game.id} 
-            game={game} 
+          <GameCard
+            key={game.id}
+            game={game}
             isFavorite={favorites.includes(game.id)}
             onToggleFavorite={onToggleFavorite}
           />
         ))}
       </div>
-      
+
       <div className="relative overflow-hidden bg-[#242626] rounded-3xl border border-white/5 p-8 md:p-12 group transition-all shadow-xl">
         <div className="absolute -right-8 -bottom-8 text-white/[0.02] pointer-events-none group-hover:text-white/[0.04] transition-colors">
           <svg className="w-64 h-64" fill="currentColor" viewBox="0 0 24 24">
@@ -109,11 +126,11 @@ const GamesSection: React.FC<GamesSectionProps> = ({ onSuggestClick, favorites, 
           <div className="flex-grow max-w-2xl text-center md:text-left">
             <h3 className="text-3xl md:text-4xl font-black text-white uppercase mb-4 tracking-tighter">Не нашли игру?</h3>
             <p className="text-zinc-500 text-base font-medium tracking-tight leading-relaxed">
-              Напишите нам, и мы добавим её в каталог в течение <span className="text-white font-bold">24 часов</span>. 
+              Напишите нам, и мы добавим её в каталог в течение <span className="text-white font-bold">24 часов</span>.
             </p>
           </div>
-          
-          <button 
+
+          <button
             onClick={onSuggestClick}
             className="shrink-0 flex items-center gap-4 px-10 py-5 bg-blue-600 text-white font-black text-[13px] uppercase tracking-[0.2em] hover:bg-blue-500 transition-all border-none shadow-xl active:scale-95 cursor-pointer rounded-2xl group/btn"
           >

@@ -3,14 +3,16 @@ import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } fro
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { FastifyInstance } from 'fastify';
 
+export interface StoragePlugin {
+    client: S3Client;
+    uploadFile: (key: string, body: Buffer | Uint8Array | Blob | string | ReadableStream, contentType: string) => Promise<string>;
+    getFileUrl: (key: string) => Promise<string>;
+    deleteFile: (key: string) => Promise<void>;
+}
+
 declare module 'fastify' {
     interface FastifyInstance {
-        storage: {
-            client: S3Client;
-            uploadFile: (key: string, body: Buffer | Uint8Array | Blob | string | ReadableStream, contentType: string) => Promise<string>;
-            getFileUrl: (key: string) => Promise<string>;
-            deleteFile: (key: string) => Promise<void>;
-        };
+        storage: StoragePlugin;
     }
 }
 

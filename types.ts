@@ -9,6 +9,8 @@ export interface Game {
   slug: string;
   title: string;
   imageUrl: string;
+  cover_url?: string;
+  stats?: any;
   modCount: string;
   downloadCount: string;
   categories: string[];

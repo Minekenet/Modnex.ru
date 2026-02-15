@@ -39,10 +39,16 @@ server.register(itemsRoutes);
 server.register(filesRoutes);
 
 import { runMigrations } from './db/migrate';
+import { seedDatabase } from './db/seed';
 
 server.ready(async (err) => {
     if (err) throw err;
-    await runMigrations(server);
+    try {
+        await runMigrations(server);
+        await seedDatabase(server);
+    } catch (dbErr) {
+        server.log.error(dbErr, 'DB initialization failed');
+    }
 });
 
 server.get('/health', async (request, reply) => {

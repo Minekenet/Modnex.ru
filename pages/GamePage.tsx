@@ -10,12 +10,36 @@ interface GamePageProps {
 
 type ViewMode = 'grid' | 'compact' | 'list';
 
+import { gamesService } from '../api/games';
+
 const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
   const { gameSlug, categorySlug } = ReactRouterDOM.useParams();
   const navigate = ReactRouterDOM.useNavigate();
-  
-  const game = useMemo(() => {
+
+  const [game, setGame] = useState<any>(() => {
     return GAMES_DATA.find(g => g.slug === gameSlug) || GAMES_DATA[0];
+  });
+
+  useEffect(() => {
+    const fetchGame = async () => {
+      if (!gameSlug) return;
+      try {
+        const data = await gamesService.getBySlug(gameSlug);
+        if (data) {
+          const local = GAMES_DATA.find(l => l.slug === data.slug);
+          const stats = typeof data.stats === 'string' ? JSON.parse(data.stats) : (data.stats || {});
+          setGame({
+            ...data,
+            imageUrl: data.cover_url || local?.imageUrl || '',
+            modCount: stats.modCount || local?.modCount || '0',
+            downloadCount: stats.downloads || local?.downloadCount || '0'
+          });
+        }
+      } catch (err) {
+        console.warn('API fetch failed for game, using local data', err);
+      }
+    };
+    fetchGame();
   }, [gameSlug]);
 
   const categories = game.categories || DEFAULT_GAME_CONFIG.categories;
@@ -103,9 +127,9 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
   };
 
   const getViewModeIcon = () => {
-    if (viewMode === 'grid') return <path d="M4 4h4v4H4V4zm6 0h4v4h-4V4zm6 0h4v4h-4V4zM4 10h4v4H4v-4zm6 0h4v4h-4v-4zm6 0h4v4h-4v-4zM4 16h4v4H4v-4zm6 0h4v4h-4v-4zm6 0h4v4h-4v-4z"/>;
-    if (viewMode === 'compact') return <path d="M3 4h18v2H3V4zm0 7h18v2H3v-2zm0 7h18v2H3v-2z"/>;
-    return <path d="M4 6h2v2H4V6zm4 0h12v2H8V6zM4 11h2v2H4v-2zm4 0h12v2H8v-2zm-4 5h2v2H4v-2zm4 0h12v2H8v-2z"/>;
+    if (viewMode === 'grid') return <path d="M4 4h4v4H4V4zm6 0h4v4h-4V4zm6 0h4v4h-4V4zM4 10h4v4H4v-4zm6 0h4v4h-4v-4zm6 0h4v4h-4v-4zM4 16h4v4H4v-4zm6 0h4v4h-4v-4zm6 0h4v4h-4v-4z" />;
+    if (viewMode === 'compact') return <path d="M3 4h18v2H3V4zm0 7h18v2H3v-2zm0 7h18v2H3v-2z" />;
+    return <path d="M4 6h2v2H4V6zm4 0h12v2H8V6zM4 11h2v2H4v-2zm4 0h12v2H8v-2zm-4 5h2v2H4v-2zm4 0h12v2H8v-2z" />;
   };
 
   const getPageNumbers = () => {
@@ -129,7 +153,7 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
           <img src={game.imageUrl} className="w-full h-full object-cover opacity-20 grayscale-[0.3] scale-105 blur-[2px]" alt="" />
           <div className="absolute inset-0 bg-gradient-to-t from-[#1c1c1f] via-[#1c1c1f]/40 to-transparent"></div>
         </div>
-        
+
         <div className="relative z-10 max-w-[1300px] mx-auto w-full px-8">
           <nav className="flex items-center gap-2 text-[14px] font-medium text-zinc-500 mb-8">
             <ReactRouterDOM.Link to="/" className="hover:text-white transition-colors no-underline">Home</ReactRouterDOM.Link>
@@ -174,9 +198,8 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
               <ReactRouterDOM.Link
                 key={cat}
                 to={`/game/${game.slug}/${slugify(cat)}`}
-                className={`px-3 py-1.5 text-[14px] font-bold transition-all border-none cursor-pointer rounded-md no-underline ${
-                  activeCategory === cat ? 'bg-white/10 text-white' : 'text-zinc-500 hover:text-white hover:bg-white/5'
-                }`}
+                className={`px-3 py-1.5 text-[14px] font-bold transition-all border-none cursor-pointer rounded-md no-underline ${activeCategory === cat ? 'bg-white/10 text-white' : 'text-zinc-500 hover:text-white hover:bg-white/5'
+                  }`}
               >
                 {cat}
               </ReactRouterDOM.Link>
@@ -186,14 +209,14 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
           {!isSkinsCategory && filterGroups.map((group, i) => {
             const hasManyOptions = group.options.length > 10;
             const searchTerm = filterSearch[group.label] || '';
-            const filteredOptions = group.options.filter(opt => 
+            const filteredOptions = group.options.filter(opt =>
               opt.toLowerCase().includes(searchTerm.toLowerCase())
             );
 
             return (
               <div key={i} className="bg-[#27292e] rounded-xl overflow-hidden">
-                <button 
-                  onClick={() => setCollapsedFilters(p => ({...p, [group.label]: !p[group.label]}))} 
+                <button
+                  onClick={() => setCollapsedFilters(p => ({ ...p, [group.label]: !p[group.label] }))}
                   className="w-full px-5 py-3.5 flex items-center justify-between bg-transparent border-none cursor-pointer text-left"
                 >
                   <span className="text-[14px] font-bold text-zinc-400 tracking-wider">
@@ -201,15 +224,15 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
                   </span>
                   <svg className={`w-3.5 h-3.5 text-zinc-600 transition-transform ${collapsedFilters[group.label] ? '-rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
                 </button>
-                
+
                 {!collapsedFilters[group.label] && (
                   <div className="px-5 pb-5 flex flex-col gap-2">
                     {hasManyOptions && (
                       <div className="mb-3">
-                        <input 
+                        <input
                           type="text"
                           value={searchTerm}
-                          onChange={(e) => setFilterSearch(p => ({...p, [group.label]: e.target.value}))}
+                          onChange={(e) => setFilterSearch(p => ({ ...p, [group.label]: e.target.value }))}
                           placeholder="Поиск..."
                           className="w-full bg-[#1c1c1f] text-[13px] px-3 py-2 rounded-lg border-none text-zinc-300 placeholder:text-zinc-600 outline-none"
                         />
@@ -220,11 +243,11 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
                         {filteredOptions.map(opt => (
                           <label key={opt} className="flex items-center gap-3 cursor-pointer group py-0.5">
                             <div className="relative flex items-center h-4 w-4 shrink-0">
-                              <input 
-                                type="checkbox" 
+                              <input
+                                type="checkbox"
                                 checked={(selectedFilters[group.label] || []).includes(opt)}
                                 onChange={() => toggleFilter(group.label, opt)}
-                                className="peer absolute inset-0 opacity-0 cursor-pointer z-10" 
+                                className="peer absolute inset-0 opacity-0 cursor-pointer z-10"
                               />
                               <div className="h-4 w-4 rounded bg-[#1c1c1f] peer-checked:bg-blue-500 transition-colors flex items-center justify-center">
                                 <svg className="w-2.5 h-2.5 text-white opacity-0 peer-checked:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -250,9 +273,9 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
           <div className="mb-8 space-y-4">
             <div className="relative w-full h-11 bg-[#27292e] rounded-lg px-4 flex items-center group transition-all">
               <svg className="w-4 h-4 text-zinc-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-              <input 
-                type="text" 
-                value={searchMod} 
+              <input
+                type="text"
+                value={searchMod}
                 onChange={(e) => setSearchMod(e.target.value)}
                 placeholder="Search content..."
                 className="flex-grow h-full bg-transparent px-3 text-[14px] font-medium border-none text-white placeholder:text-zinc-600 outline-none"
@@ -261,8 +284,8 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
 
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <select 
-                  value={sortBy} 
+                <select
+                  value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
                   className="bg-[#27292e] text-zinc-300 px-4 py-2 rounded-lg text-[13px] font-bold border-none outline-none cursor-pointer"
                 >
@@ -270,16 +293,16 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
                   <option value="Newest">Sort by: Newest</option>
                   <option value="Popularity">Sort by: Popularity</option>
                 </select>
-                <button 
+                <button
                   onClick={toggleViewMode}
                   className="h-10 w-10 flex items-center justify-center bg-[#27292e] rounded-lg text-zinc-400 hover:text-white transition-all border-none cursor-pointer"
                 >
-                   <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">{getViewModeIcon()}</svg>
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">{getViewModeIcon()}</svg>
                 </button>
               </div>
 
               <div className="flex items-center gap-2">
-                <button 
+                <button
                   disabled={currentPage === 1}
                   onClick={() => handlePageChange(currentPage - 1)}
                   className={`text-zinc-600 hover:text-white transition-colors cursor-pointer bg-transparent border-none ${currentPage === 1 ? 'opacity-30 cursor-not-allowed' : ''}`}
@@ -288,18 +311,17 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
                 </button>
                 <div className="flex items-center gap-1.5">
                   {getPageNumbers().map((n, i) => (
-                    <button 
+                    <button
                       key={i}
                       onClick={() => typeof n === 'number' && handlePageChange(n)}
-                      className={`text-[15px] font-bold transition-all bg-transparent border-none cursor-pointer flex items-center justify-center min-w-[28px] ${
-                        currentPage === n ? 'text-white underline underline-offset-4' : 'text-zinc-500 hover:text-white'
-                      }`}
+                      className={`text-[15px] font-bold transition-all bg-transparent border-none cursor-pointer flex items-center justify-center min-w-[28px] ${currentPage === n ? 'text-white underline underline-offset-4' : 'text-zinc-500 hover:text-white'
+                        }`}
                     >
                       {n}
                     </button>
                   ))}
                 </div>
-                <button 
+                <button
                   disabled={currentPage === totalPages}
                   onClick={() => handlePageChange(currentPage + 1)}
                   className={`text-zinc-600 hover:text-white transition-colors cursor-pointer bg-transparent border-none ${currentPage === totalPages ? 'opacity-30 cursor-not-allowed' : ''}`}
@@ -310,17 +332,16 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
             </div>
           </div>
 
-          <div className={`grid gap-6 ${
-            isSkinsCategory 
-            ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5' 
-            : viewMode === 'grid' 
-              ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' 
+          <div className={`grid gap-6 ${isSkinsCategory
+            ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5'
+            : viewMode === 'grid'
+              ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
               : 'grid-cols-1'
-          }`}>
+            }`}>
             {filteredMods.map((mod) => (
-              <div 
-                key={mod.id} 
-                className="bg-[#27292e] rounded-xl overflow-hidden flex flex-col group cursor-pointer border border-white/[0.03] transition-all hover:bg-white/[0.02]" 
+              <div
+                key={mod.id}
+                className="bg-[#27292e] rounded-xl overflow-hidden flex flex-col group cursor-pointer border border-white/[0.03] transition-all hover:bg-white/[0.02]"
                 onClick={() => navigate(`/game/${game.slug}/mod/${mod.id}`)}
               >
                 <div className={`${isSkinsCategory ? 'aspect-[2/3]' : 'aspect-video'} relative overflow-hidden bg-[#1c1c1f]`}>
@@ -330,8 +351,8 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
                   )}
                   {isSkinsCategory && (
                     <div className="absolute bottom-3 left-3 right-3">
-                       <h3 className="font-bold text-[13px] text-white truncate">{mod.name}</h3>
-                       <span className="text-[10px] text-zinc-400">By {mod.author}</span>
+                      <h3 className="font-bold text-[13px] text-white truncate">{mod.name}</h3>
+                      <span className="text-[10px] text-zinc-400">By {mod.author}</span>
                     </div>
                   )}
                 </div>
@@ -339,8 +360,8 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
                   <div className="p-5 flex flex-col gap-2">
                     <h3 className="font-bold text-[15px] text-white line-clamp-2 leading-snug">{mod.name}</h3>
                     <div className="flex items-center gap-2 mt-2">
-                       <div className="w-5 h-5 rounded-full overflow-hidden bg-[#1c1c1f]"><img src={`https://i.pravatar.cc/50?u=${mod.author}`} className="w-full h-full object-cover" alt="" /></div>
-                       <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-tight">{mod.author}</span>
+                      <div className="w-5 h-5 rounded-full overflow-hidden bg-[#1c1c1f]"><img src={`https://i.pravatar.cc/50?u=${mod.author}`} className="w-full h-full object-cover" alt="" /></div>
+                      <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-tight">{mod.author}</span>
                     </div>
                   </div>
                 )}
@@ -349,7 +370,7 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
           </div>
 
           <div className="mt-16 py-8 flex items-center justify-center gap-6">
-            <button 
+            <button
               disabled={currentPage === 1}
               onClick={() => handlePageChange(currentPage - 1)}
               className={`text-zinc-600 hover:text-white transition-colors border-none bg-transparent cursor-pointer ${currentPage === 1 ? 'opacity-30 cursor-not-allowed' : ''}`}
@@ -358,18 +379,17 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
             </button>
             <div className="flex items-center gap-5">
               {getPageNumbers().map((n, i) => (
-                <button 
+                <button
                   key={i}
                   onClick={() => typeof n === 'number' && handlePageChange(n)}
-                  className={`text-[16px] font-bold border-none bg-transparent cursor-pointer transition-all ${
-                    currentPage === n ? 'text-white underline underline-offset-8' : 'text-zinc-600 hover:text-white'
-                  }`}
+                  className={`text-[16px] font-bold border-none bg-transparent cursor-pointer transition-all ${currentPage === n ? 'text-white underline underline-offset-8' : 'text-zinc-600 hover:text-white'
+                    }`}
                 >
                   {n}
                 </button>
               ))}
             </div>
-            <button 
+            <button
               disabled={currentPage === totalPages}
               onClick={() => handlePageChange(currentPage + 1)}
               className={`text-zinc-600 hover:text-white transition-colors border-none bg-transparent cursor-pointer ${currentPage === totalPages ? 'opacity-30 cursor-not-allowed' : ''}`}
