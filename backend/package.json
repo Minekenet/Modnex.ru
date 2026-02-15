@@ -20,12 +20,16 @@
         "@aws-sdk/lib-storage": "^3.515.0",
         "@aws-sdk/s3-request-presigner": "^3.515.0",
         "fastify-plugin": "^4.5.1",
+        "bcryptjs": "^2.4.3",
+        "@fastify/jwt": "^8.0.0",
+        "@fastify/multipart": "^8.1.0",
         "dotenv": "^16.4.5"
     },
     "devDependencies": {
         "typescript": "^5.3.3",
         "@types/node": "^20.11.19",
         "@types/pg": "^8.11.0",
+        "@types/bcryptjs": "^2.4.6",
         "ts-node-dev": "^2.0.0"
     }
 }
