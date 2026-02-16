@@ -10,29 +10,100 @@ const AuthPage: React.FC = () => {
   const [mode, setMode] = useState<AuthMode>('login');
   const [prevMode, setPrevMode] = useState<AuthMode>('login');
   const [formData, setFormData] = useState({ username: '', email: '', password: '' });
+  const [verificationCode, setVerificationCode] = useState(['', '', '', '', '', '']);
+  const [timer, setTimer] = useState(1800); // 30 minutes in seconds
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const navigate = ReactRouterDOM.useNavigate();
+  const [searchParams] = ReactRouterDOM.useSearchParams();
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  React.useEffect(() => {
+    const token = searchParams.get('token');
+    const user = searchParams.get('user');
+    const errorParam = searchParams.get('error');
+
+    if (token && user) {
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', user);
+      navigate('/profile');
+    }
+    if (errorParam) {
+      setError('Ошибка авторизации через соцсеть');
+    }
+  }, [searchParams, navigate]);
+
+  const startTimer = () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    setTimer(1800);
+    timerRef.current = setInterval(() => {
+      setTimer(prev => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current!);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     try {
       if (mode === 'login') {
-        await authService.login(formData.email, formData.password);
+        const res = await authService.login(formData.email, formData.password);
+        if (res.needsVerification) {
+          setMode('verify-code');
+          startTimer();
+          return;
+        }
         navigate('/profile');
       } else if (mode === 'register') {
-        await authService.register(formData.username, formData.email, formData.password);
+        const res = await authService.register(formData.username, formData.email, formData.password);
+        console.log('Verification code (debug):', res.debugCode);
+        setMode('verify-code');
+        startTimer();
+      } else if (mode === 'verify-code') {
+        const code = verificationCode.join('');
+        await authService.verify(formData.email, code);
         navigate('/profile');
       }
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Authentication failed');
+      setError(err.response?.data?.error || 'Произошла ошибка');
     }
   };
 
-  const handleSocialLogin = (provider: string) => {
-    console.log(`Вход через ${provider}...`);
-    // navigate('/profile');
+  const handleCodeChange = (index: number, value: string) => {
+    if (value.length > 1) value = value.slice(-1);
+    if (!/^\d*$/.test(value)) return;
+
+    const newCode = [...verificationCode];
+    newCode[index] = value;
+    setVerificationCode(newCode);
+
+    if (value && index < 5) {
+      const nextInput = document.getElementById(`code-${index + 1}`);
+      nextInput?.focus();
+    }
+  };
+
+  const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === 'Backspace' && !verificationCode[index] && index > 0) {
+      const prevInput = document.getElementById(`code-${index - 1}`);
+      prevInput?.focus();
+    }
+  };
+
+  const handleSocialLogin = (provider: 'google' | 'yandex') => {
+    // Редирект на бэкенд для начала процесса OAuth 2.0
+    window.location.href = `/api/auth/${provider}`;
   };
 
   return (
@@ -45,6 +116,7 @@ const AuthPage: React.FC = () => {
             {mode === 'login' && 'Войти через'}
             {mode === 'register' && 'Регистрация'}
             {mode === 'forgot-password' && 'Сброс пароля'}
+            {mode === 'verify-code' && 'Подтверждение'}
           </h2>
           {error && <p className="text-red-500 text-sm mt-4 font-bold uppercase tracking-tight">{error}</p>}
         </div>
@@ -54,7 +126,7 @@ const AuthPage: React.FC = () => {
           <div className="grid grid-cols-2 gap-3 mb-10">
             <button
               type="button"
-              onClick={() => handleSocialLogin('Google')}
+              onClick={() => handleSocialLogin('google')}
               className="flex items-center gap-3 px-5 py-4 bg-[#2e333a] hover:bg-[#383d46] rounded-2xl border-none cursor-pointer transition-all active:scale-95 group"
             >
               <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
@@ -67,7 +139,7 @@ const AuthPage: React.FC = () => {
             </button>
             <button
               type="button"
-              onClick={() => handleSocialLogin('Yandex')}
+              onClick={() => handleSocialLogin('yandex')}
               className="flex items-center gap-3 px-5 py-4 bg-[#2e333a] hover:bg-[#383d46] rounded-2xl border-none cursor-pointer transition-all active:scale-95 group"
             >
               <div className="w-5 h-5 bg-[#ff0000] rounded-full flex items-center justify-center text-white font-black text-[10px]">Я</div>
@@ -100,19 +172,21 @@ const AuthPage: React.FC = () => {
               </div>
             )}
 
-            <div className="relative">
-              <div className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-600 pointer-events-none">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+            {mode !== 'verify-code' && (
+              <div className="relative">
+                <div className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-600 pointer-events-none">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                </div>
+                <input
+                  type="email"
+                  placeholder="Электронная почта"
+                  required
+                  value={formData.email}
+                  onChange={e => setFormData({ ...formData, email: e.target.value })}
+                  className="w-full h-16 bg-[#2e333a] text-white pl-14 pr-6 rounded-2xl border-none outline-none placeholder:text-zinc-600 font-bold focus:bg-[#383d46] transition-all text-[15px]"
+                />
               </div>
-              <input
-                type="email"
-                placeholder="Электронная почта"
-                required
-                value={formData.email}
-                onChange={e => setFormData({ ...formData, email: e.target.value })}
-                className="w-full h-16 bg-[#2e333a] text-white pl-14 pr-6 rounded-2xl border-none outline-none placeholder:text-zinc-600 font-bold focus:bg-[#383d46] transition-all text-[15px]"
-              />
-            </div>
+            )}
 
             {(mode === 'login' || mode === 'register') && (
               <div className="relative group">
@@ -132,6 +206,42 @@ const AuthPage: React.FC = () => {
                 </button>
               </div>
             )}
+
+            {mode === 'verify-code' && (
+              <div className="space-y-6">
+                <p className="text-zinc-400 text-sm font-bold text-center uppercase tracking-wider">
+                  Код отправлен на {formData.email}
+                </p>
+                <div className="flex justify-between gap-2">
+                  {verificationCode.map((digit, idx) => (
+                    <input
+                      key={idx}
+                      id={`code-${idx}`}
+                      type="text"
+                      maxLength={1}
+                      value={digit}
+                      onChange={e => handleCodeChange(idx, e.target.value)}
+                      onKeyDown={e => handleKeyDown(idx, e)}
+                      className="w-12 h-16 bg-[#2e333a] text-white text-center rounded-xl border-none outline-none font-black text-2xl focus:bg-[#383d46] transition-all"
+                    />
+                  ))}
+                </div>
+                <div className="text-center">
+                  <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">
+                    Код истечет через: <span className="text-[#58a6ff]">{formatTime(timer)}</span>
+                  </p>
+                  {timer === 0 && (
+                    <button
+                      type="button"
+                      onClick={handleAuthSubmit}
+                      className="mt-2 text-[#58a6ff] hover:underline text-xs font-black uppercase bg-transparent border-none cursor-pointer"
+                    >
+                      Отправить код повторно
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex justify-center pt-8">
@@ -140,7 +250,7 @@ const AuthPage: React.FC = () => {
               className="flex items-center gap-3 px-12 py-5 bg-[#3e3f47] hover:bg-white hover:text-black text-white font-black rounded-2xl transition-all border-none cursor-pointer active:scale-95 shadow-lg group/btn"
             >
               <span className="text-[16px] uppercase tracking-wider">
-                {mode === 'login' ? 'Войти сейчас' : mode === 'register' ? 'Регистрация' : 'Продолжить'}
+                {mode === 'login' ? 'Войти сейчас' : mode === 'register' ? 'Регистрация' : mode === 'verify-code' ? 'Подтвердить' : 'Продолжить'}
               </span>
               <svg className="w-5 h-5 transition-transform group-hover/btn:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
             </button>

@@ -6,9 +6,14 @@ CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     username VARCHAR(50) UNIQUE NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
+    password_hash VARCHAR(255), -- Nullable for social login
     role VARCHAR(20) DEFAULT 'user' CHECK (role IN ('user', 'admin')),
     avatar_url VARCHAR(255),
+    is_verified BOOLEAN DEFAULT false,
+    verification_code VARCHAR(10),
+    verification_expires TIMESTAMP WITH TIME ZONE,
+    google_id VARCHAR(255) UNIQUE,
+    yandex_id VARCHAR(255) UNIQUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
