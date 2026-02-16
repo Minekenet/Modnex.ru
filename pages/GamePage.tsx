@@ -1,7 +1,11 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import * as ReactRouterDOM from 'react-router-dom';
-import { GAMES_DATA, DEFAULT_GAME_CONFIG } from '../constants';
+import { CardViewMapper } from '../components/Catalog/CardViewMapper';
+import { projectsService } from '../api/projects';
+import { Project } from '../types';
+import { gamesService } from '../api/games';
+import Skeleton from '../components/UI/Skeleton';
 
 interface GamePageProps {
   favorites: string[];
@@ -10,43 +14,51 @@ interface GamePageProps {
 
 type ViewMode = 'grid' | 'compact' | 'list';
 
-import { gamesService } from '../api/games';
-
 const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
   const { gameSlug, categorySlug } = ReactRouterDOM.useParams();
   const navigate = ReactRouterDOM.useNavigate();
 
-  const [game, setGame] = useState<any>(() => {
-    return GAMES_DATA.find(g => g.slug === gameSlug) || GAMES_DATA[0];
-  });
+  const [game, setGame] = useState<any>(null);
+  const [loadingGame, setLoadingGame] = useState(true);
 
   useEffect(() => {
     const fetchGame = async () => {
       if (!gameSlug) return;
       try {
+        setLoadingGame(true);
         const data = await gamesService.getBySlug(gameSlug);
         if (data) {
-          const local = GAMES_DATA.find(l => l.slug === data.slug);
           const stats = typeof data.stats === 'string' ? JSON.parse(data.stats) : (data.stats || {});
+
+          // Map backend sections to frontend categories/filters
+          const sections = data.sections || [];
+          const categoriesList = sections.map((s: any) => s.name);
+
           setGame({
             ...data,
-            imageUrl: data.cover_url || local?.imageUrl || '',
-            modCount: stats.modCount || local?.modCount || '0',
-            downloadCount: stats.downloads || local?.downloadCount || '0'
+            imageUrl: data.cover_url || '',
+            modCount: stats.modCount || '0',
+            downloadCount: stats.downloads || '0',
+            categories: categoriesList,
+            // filters will be derived based on activeCategory later or we can pre-map them
+            sections: sections,
+            view_config: data.view_config || {}
           });
         }
       } catch (err) {
-        console.warn('API fetch failed for game, using local data', err);
+        console.error('API fetch failed for game', err);
+      } finally {
+        setLoadingGame(false);
       }
     };
     fetchGame();
   }, [gameSlug]);
 
-  const categories = game.categories || DEFAULT_GAME_CONFIG.categories;
-  const filterGroups = game.filters || DEFAULT_GAME_CONFIG.filters;
+  const categories = game?.categories || [];
+  const filterGroups = game?.filters || [];
 
   // Helper to slugify category name
-  const slugify = (text: string) => text.toLowerCase().replace(/\s+/g, '-');
+  const slugify = (text: string | undefined) => (text || '').toLowerCase().replace(/\s+/g, '-');
 
   // Derive active category from URL or default
   const activeCategory = useMemo(() => {
@@ -64,8 +76,12 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
   const [filterSearch, setFilterSearch] = useState<Record<string, string>>({});
   const [selectedFilters, setSelectedFilters] = useState<Record<string, string[]>>({});
 
-  const totalPages = 500;
-  const isFavorite = favorites.includes(game.id);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [totalItems, setTotalItems] = useState(0);
+
+  const isFavorite = game ? favorites.includes(game.id) : false;
 
   // Сброс при смене игры или категории
   useEffect(() => {
@@ -75,37 +91,44 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
     window.scrollTo(0, 0);
   }, [gameSlug, categorySlug]);
 
-  // Генерация модов
-  const mods = useMemo(() => {
-    return Array.from({ length: 40 }, (_, i) => {
-      const attributes: Record<string, string> = {};
-      filterGroups.forEach(group => {
-        attributes[group.label] = group.options[Math.floor(Math.random() * group.options.length)];
-      });
+  useEffect(() => {
+    const fetchProjects = async () => {
+      if (!game) return;
+      try {
+        setLoading(true);
+        const sectionSlug = slugify(activeCategory);
 
-      return {
-        id: `mod-${i}-${currentPage}-${activeCategory}`,
-        name: i === 0 ? 'Ultra Realistic Pack' : `${game.title} Content #${i + 1 + (currentPage - 1) * 20}`,
-        author: ['eldeston', 'tsptds', 'modder99', 'pro_gamer'][i % 4],
-        downloads: `${(Math.random() * 10).toFixed(1)}M`,
-        relativeDate: `${i + 1} days ago`,
-        size: `${(Math.random() * 500).toFixed(1)} MB`,
-        desc: 'Universal content description for testing functional filters and dynamic layouts.',
-        attributes
-      };
-    });
-  }, [game.id, currentPage, filterGroups, activeCategory]);
+        // Flatten filters for API
+        const apiFilters: Record<string, string> = {
+          q: searchMod,
+          sort: sortBy,
+          page: String(currentPage),
+          limit: '20'
+        };
 
-  const filteredMods = useMemo(() => {
-    return mods.filter(mod => {
-      const matchesSearch = mod.name.toLowerCase().includes(searchMod.toLowerCase());
-      const matchesFilters = (Object.entries(selectedFilters) as [string, string[]][]).every(([groupLabel, selectedOptions]) => {
-        if (!selectedOptions || selectedOptions.length === 0) return true;
-        return selectedOptions.includes(mod.attributes[groupLabel]);
-      });
-      return matchesSearch && matchesFilters;
-    });
-  }, [mods, searchMod, selectedFilters]);
+        Object.entries(selectedFilters).forEach(([key, values]) => {
+          const filterValues = values as string[];
+          if (filterValues.length > 0) {
+            apiFilters[key.toLowerCase()] = filterValues[0];
+          }
+        });
+
+        const data = (await projectsService.getAll(game.slug, sectionSlug, apiFilters)) as Project[];
+        setProjects(data);
+        setError(null);
+        setTotalItems(data.length);
+      } catch (err) {
+        console.error('Failed to fetch projects:', err);
+        setError('Не удалось загрузить проекты');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProjects();
+  }, [game?.slug, activeCategory, selectedFilters, searchMod, sortBy, currentPage]);
+
+  const totalPages = Math.ceil(totalItems / 20) || 1;
 
   const toggleFilter = (groupLabel: string, option: string) => {
     setSelectedFilters(prev => {
@@ -144,13 +167,41 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
     return pages;
   };
 
-  const isSkinsCategory = activeCategory.toLowerCase().includes('skin') || activeCategory.toLowerCase().includes('скин');
+  const sectionConfig = useMemo(() => {
+    if (!game || !activeCategory) return { viewType: 'grid' };
+
+    const activeSection = (game.sections || []).find((s: any) => s.name === activeCategory);
+    if (activeSection && activeSection.ui_config) {
+      return typeof activeSection.ui_config === 'string' ? JSON.parse(activeSection.ui_config) : activeSection.ui_config;
+    }
+
+    const viewConfig = typeof game.view_config === 'string' ? JSON.parse(game.view_config) : game.view_config;
+    const gameSectionsConfigs = viewConfig.sections || {};
+    return gameSectionsConfigs[slugify(activeCategory)] || viewConfig.defaultConfig || { viewType: 'grid' };
+  }, [game, activeCategory]);
+
+  const currentFilters = useMemo(() => {
+    if (!game || !activeCategory) return [];
+    const activeSection = (game.sections || []).find((s: any) => s.name === activeCategory);
+    if (activeSection && activeSection.filter_config) {
+      return typeof activeSection.filter_config === 'string' ? JSON.parse(activeSection.filter_config) : activeSection.filter_config;
+    }
+    return game.filters || [];
+  }, [game, activeCategory]);
+
+  const filterGroups = currentFilters;
+
+  const viewType = sectionConfig.viewType || 'grid';
 
   return (
     <div className="min-h-screen bg-[#1c1c1f] text-white selection:bg-white selection:text-black font-['Inter',_sans-serif]">
       <div className="relative w-full overflow-hidden pt-6 pb-12">
         <div className="absolute inset-0 z-0">
-          <img src={game.imageUrl} className="w-full h-full object-cover opacity-20 grayscale-[0.3] scale-105 blur-[2px]" alt="" />
+          {game?.imageUrl ? (
+            <img src={game.imageUrl} className="w-full h-full object-cover opacity-20 grayscale-[0.3] scale-105 blur-[2px]" alt="" />
+          ) : (
+            <Skeleton className="w-full h-full opacity-10" />
+          )}
           <div className="absolute inset-0 bg-gradient-to-t from-[#1c1c1f] via-[#1c1c1f]/40 to-transparent"></div>
         </div>
 
@@ -158,31 +209,47 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
           <nav className="flex items-center gap-2 text-[14px] font-medium text-zinc-500 mb-8">
             <ReactRouterDOM.Link to="/" className="hover:text-white transition-colors no-underline">Home</ReactRouterDOM.Link>
             <svg className="w-3 h-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M9 5l7 7-7 7" /></svg>
-            <ReactRouterDOM.Link to={`/game/${game.slug}`} className="hover:text-white transition-colors no-underline">{game.title}</ReactRouterDOM.Link>
-            <svg className="w-3 h-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M9 5l7 7-7 7" /></svg>
-            <span className="text-white">{activeCategory}</span>
+            {game ? (
+              <>
+                <ReactRouterDOM.Link to={`/game/${game.slug}`} className="hover:text-white transition-colors no-underline">{game.title}</ReactRouterDOM.Link>
+                <svg className="w-3 h-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M9 5l7 7-7 7" /></svg>
+                <span className="text-white">{activeCategory}</span>
+              </>
+            ) : (
+              <Skeleton className="w-32 h-4" />
+            )}
           </nav>
 
           <div className="flex flex-col md:flex-row items-start gap-10">
             <div className="w-40 h-56 shrink-0 overflow-hidden shadow-2xl rounded-lg bg-[#27292e] border border-white/5">
-              <img src={game.imageUrl} className="w-full h-full object-cover" alt={game.title} />
+              {game?.imageUrl ? (
+                <img src={game.imageUrl} className="w-full h-full object-cover" alt={game?.title} />
+              ) : (
+                <Skeleton className="w-full h-full" />
+              )}
             </div>
             <div className="flex flex-col gap-6 pt-2">
               <div className="flex flex-wrap items-center gap-6">
-                <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-white leading-none">{game.title}</h1>
-                <button onClick={() => onToggleFavorite(game.id)} className={`w-10 h-10 rounded-full flex items-center justify-center transition-all border-none cursor-pointer shadow-lg active:scale-90 ${isFavorite ? 'bg-yellow-400 text-zinc-950' : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'}`}>
-                  <svg className="w-5 h-5" fill={isFavorite ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
-                </button>
+                {game ? (
+                  <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-white leading-none">{game.title}</h1>
+                ) : (
+                  <Skeleton className="w-64 h-16" />
+                )}
+                {game && (
+                  <button onClick={() => onToggleFavorite(game.id)} className={`w-10 h-10 rounded-full flex items-center justify-center transition-all border-none cursor-pointer shadow-lg active:scale-90 ${isFavorite ? 'bg-yellow-400 text-zinc-950' : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'}`}>
+                    <svg className="w-5 h-5" fill={isFavorite ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
+                  </button>
+                )}
               </div>
               <div className="flex items-center gap-10 text-zinc-500 uppercase tracking-widest text-[10px] font-bold">
                 <div className="flex flex-col gap-1">
                   <span className="opacity-50">Файлов</span>
-                  <span className="text-white text-lg">{game.modCount}</span>
+                  {game ? <span className="text-white text-lg">{game.modCount}</span> : <Skeleton className="w-10 h-6" />}
                 </div>
                 <div className="w-[1px] h-8 bg-white/10"></div>
                 <div className="flex flex-col gap-1">
                   <span className="opacity-50">Загрузок</span>
-                  <span className="text-white text-lg">{game.downloadCount}</span>
+                  {game ? <span className="text-white text-lg">{game.downloadCount}</span> : <Skeleton className="w-10 h-6" />}
                 </div>
               </div>
             </div>
@@ -194,7 +261,7 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
         {/* Sidebar Filters */}
         <div className="hidden lg:block space-y-4">
           <div className="mb-6 flex flex-wrap gap-1.5">
-            {categories.map((cat) => (
+            {game ? categories.map((cat) => (
               <ReactRouterDOM.Link
                 key={cat}
                 to={`/game/${game.slug}/${slugify(cat)}`}
@@ -203,10 +270,12 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
               >
                 {cat}
               </ReactRouterDOM.Link>
-            ))}
+            )) : (
+              <Skeleton className="w-full h-10" />
+            )}
           </div>
 
-          {!isSkinsCategory && filterGroups.map((group, i) => {
+          {!['skin'].includes(viewType) && filterGroups.map((group, i) => {
             const hasManyOptions = group.options.length > 10;
             const searchTerm = filterSearch[group.label] || '';
             const filteredOptions = group.options.filter(opt =>
@@ -277,7 +346,7 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
                 type="text"
                 value={searchMod}
                 onChange={(e) => setSearchMod(e.target.value)}
-                placeholder="Search content..."
+                placeholder="Search projects..."
                 className="flex-grow h-full bg-transparent px-3 text-[14px] font-medium border-none text-white placeholder:text-zinc-600 outline-none"
               />
             </div>
@@ -303,9 +372,9 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
 
               <div className="flex items-center gap-2">
                 <button
-                  disabled={currentPage === 1}
+                  disabled={currentPage === 1 || loading}
                   onClick={() => handlePageChange(currentPage - 1)}
-                  className={`text-zinc-600 hover:text-white transition-colors cursor-pointer bg-transparent border-none ${currentPage === 1 ? 'opacity-30 cursor-not-allowed' : ''}`}
+                  className={`text-zinc-600 hover:text-white transition-colors cursor-pointer bg-transparent border-none ${currentPage === 1 || loading ? 'opacity-30 cursor-not-allowed' : ''}`}
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15 19l-7-7 7-7" /></svg>
                 </button>
@@ -313,18 +382,18 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
                   {getPageNumbers().map((n, i) => (
                     <button
                       key={i}
+                      disabled={loading}
                       onClick={() => typeof n === 'number' && handlePageChange(n)}
-                      className={`text-[15px] font-bold transition-all bg-transparent border-none cursor-pointer flex items-center justify-center min-w-[28px] ${currentPage === n ? 'text-white underline underline-offset-4' : 'text-zinc-500 hover:text-white'
-                        }`}
+                      className={`text-[15px] font-bold transition-all bg-transparent border-none cursor-pointer flex items-center justify-center min-w-[28px] ${currentPage === n ? 'text-white underline underline-offset-4' : 'text-zinc-500 hover:text-white'} ${loading ? 'opacity-30' : ''}`}
                     >
                       {n}
                     </button>
                   ))}
                 </div>
                 <button
-                  disabled={currentPage === totalPages}
+                  disabled={currentPage === totalPages || loading}
                   onClick={() => handlePageChange(currentPage + 1)}
-                  className={`text-zinc-600 hover:text-white transition-colors cursor-pointer bg-transparent border-none ${currentPage === totalPages ? 'opacity-30 cursor-not-allowed' : ''}`}
+                  className={`text-zinc-600 hover:text-white transition-colors cursor-pointer bg-transparent border-none ${currentPage === totalPages || loading ? 'opacity-30 cursor-not-allowed' : ''}`}
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M9 5l7 7-7 7" /></svg>
                 </button>
@@ -332,42 +401,56 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
             </div>
           </div>
 
-          <div className={`grid gap-6 ${isSkinsCategory
-            ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5'
-            : viewMode === 'grid'
-              ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
-              : 'grid-cols-1'
-            }`}>
-            {filteredMods.map((mod) => (
-              <div
-                key={mod.id}
-                className="bg-[#27292e] rounded-xl overflow-hidden flex flex-col group cursor-pointer border border-white/[0.03] transition-all hover:bg-white/[0.02]"
-                onClick={() => navigate(`/game/${game.slug}/mod/${mod.id}`)}
-              >
-                <div className={`${isSkinsCategory ? 'aspect-[2/3]' : 'aspect-video'} relative overflow-hidden bg-[#1c1c1f]`}>
-                  <img src={`https://picsum.photos/seed/${mod.id}/${isSkinsCategory ? '400/600' : '600/350'}`} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt="" />
-                  {isSkinsCategory && (
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                  )}
-                  {isSkinsCategory && (
-                    <div className="absolute bottom-3 left-3 right-3">
-                      <h3 className="font-bold text-[13px] text-white truncate">{mod.name}</h3>
-                      <span className="text-[10px] text-zinc-400">By {mod.author}</span>
-                    </div>
-                  )}
-                </div>
-                {!isSkinsCategory && (
-                  <div className="p-5 flex flex-col gap-2">
-                    <h3 className="font-bold text-[15px] text-white line-clamp-2 leading-snug">{mod.name}</h3>
-                    <div className="flex items-center gap-2 mt-2">
-                      <div className="w-5 h-5 rounded-full overflow-hidden bg-[#1c1c1f]"><img src={`https://i.pravatar.cc/50?u=${mod.author}`} className="w-full h-full object-cover" alt="" /></div>
-                      <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-tight">{mod.author}</span>
-                    </div>
+          {!loadingGame && !game ? (
+            <div className="py-24 text-center">
+              <h2 className="text-2xl font-black uppercase text-zinc-700 mb-6">Игра не найдена</h2>
+              <ReactRouterDOM.Link to="/" className="bg-white text-black px-8 py-4 rounded-xl font-black uppercase tracking-widest text-[11px] no-underline">На главную</ReactRouterDOM.Link>
+            </div>
+          ) : loading ? (
+            <div className={`grid gap-6 ${viewType === 'skin'
+              ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5'
+              : viewMode === 'grid'
+                ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+                : 'grid-cols-1'
+              }`}>
+              {Array.from({ length: 9 }).map((_, i) => (
+                <div key={i} className={`bg-[#27292e] rounded-xl overflow-hidden border border-white/5 ${viewMode === 'list' ? 'flex items-center gap-6 p-5' : 'flex flex-col'}`}>
+                  <Skeleton className={`${viewMode === 'list' ? 'w-24 h-24' : 'w-full aspect-video'} rounded-lg`} />
+                  <div className="p-5 flex-grow space-y-3">
+                    <Skeleton className="w-20 h-3" />
+                    <Skeleton className="w-full h-5" />
+                    <Skeleton className="w-3/4 h-3" />
                   </div>
-                )}
-              </div>
-            ))}
-          </div>
+                </div>
+              ))}
+            </div>
+          ) : error ? (
+            <div className="py-12 bg-red-500/5 border border-red-500/10 rounded-2xl text-center text-red-500 font-black uppercase tracking-widest">
+              {error}
+            </div>
+          ) : projects.length === 0 ? (
+            <div className="py-24 text-center text-zinc-500 font-black uppercase tracking-widest">
+              Проектов не найдено
+            </div>
+          ) : (
+            <div className={`grid gap-6 ${viewType === 'skin'
+              ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5'
+              : viewMode === 'grid'
+                ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+                : 'grid-cols-1'
+              }`}>
+              {projects.map((proj) => (
+                <CardViewMapper
+                  key={proj.id}
+                  mod={proj}
+                  gameSlug={game.slug}
+                  viewType={viewType}
+                  viewMode={viewMode}
+                  onClick={() => navigate(`/game/${game.slug}/project/${proj.slug}`)}
+                />
+              ))}
+            </div>
+          )}
 
           <div className="mt-16 py-8 flex items-center justify-center gap-6">
             <button

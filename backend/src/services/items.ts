@@ -78,4 +78,23 @@ export class ItemService {
         const { rows } = await this.db.query(query, params);
         return rows;
     }
+
+    async findAllByUser(username: string, page: number = 1, limit: number = 20) {
+        const offset = (page - 1) * limit;
+        const query = `
+            SELECT i.id, i.title, i.slug, i.summary, i.attributes, i.stats, i.created_at, 
+                   u.username as author_name,
+                   s.slug as section_slug, g.slug as game_slug,
+                   (SELECT url FROM item_gallery WHERE item_id = i.id AND is_primary = true LIMIT 1) as cover_url
+            FROM items i
+            JOIN sections s ON i.section_id = s.id
+            JOIN games g ON s.game_id = g.id
+            JOIN users u ON i.author_id = u.id
+            WHERE u.username = $1
+            ORDER BY i.created_at DESC
+            LIMIT $2 OFFSET $3
+        `;
+        const { rows } = await this.db.query(query, [username, limit, offset]);
+        return rows;
+    }
 }

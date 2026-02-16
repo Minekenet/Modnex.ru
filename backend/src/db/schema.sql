@@ -6,9 +6,12 @@ CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     username VARCHAR(50) UNIQUE NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
+    display_name VARCHAR(100),
+    bio TEXT,
     password_hash VARCHAR(255), -- Nullable for social login
     role VARCHAR(20) DEFAULT 'user' CHECK (role IN ('user', 'admin')),
     avatar_url VARCHAR(255),
+    banner_url VARCHAR(255),
     is_verified BOOLEAN DEFAULT false,
     verification_code VARCHAR(10),
     verification_expires TIMESTAMP WITH TIME ZONE,
@@ -83,3 +86,13 @@ CREATE INDEX IF NOT EXISTS idx_items_attributes ON items USING GIN (attributes);
 CREATE INDEX IF NOT EXISTS idx_items_section_id ON items(section_id);
 CREATE INDEX IF NOT EXISTS idx_items_slug ON items(slug);
 CREATE INDEX IF NOT EXISTS idx_sections_game_id ON sections(game_id);
+
+-- User Favorite Games Table
+CREATE TABLE IF NOT EXISTS user_favorite_games (
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    game_id UUID REFERENCES games(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY(user_id, game_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_fav_user_id ON user_favorite_games(user_id);

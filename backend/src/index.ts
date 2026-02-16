@@ -8,6 +8,7 @@ import authRoutes from './routes/auth';
 import gamesRoutes from './routes/games';
 import itemsRoutes from './routes/items';
 import filesRoutes from './routes/files';
+import usersRoutes from './routes/users';
 import fastifyJwt from '@fastify/jwt';
 import fastifyMultipart from '@fastify/multipart';
 
@@ -37,6 +38,7 @@ server.register(authRoutes);
 server.register(gamesRoutes);
 server.register(itemsRoutes);
 server.register(filesRoutes);
+server.register(usersRoutes);
 
 import { runMigrations } from './db/migrate';
 import { seedDatabase } from './db/seed';

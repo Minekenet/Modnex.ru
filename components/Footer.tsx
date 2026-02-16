@@ -6,7 +6,7 @@ const Footer: React.FC = () => {
   return (
     <footer className="bg-[#0a0a0b] border-t border-white/5 pt-20 pb-12 px-8 mt-auto font-['Inter',_sans-serif]">
       <div className="max-w-[1400px] mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-16 mb-24">
-        
+
         {/* Column 1: MODNEX */}
         <div className="flex flex-col gap-8">
           <h4 className="text-white font-black text-[11px] uppercase tracking-[0.4em]">MODNEX LEGAL</h4>
@@ -39,9 +39,10 @@ const Footer: React.FC = () => {
         {/* Column 4: SOCIALS */}
         <div className="flex flex-col gap-8 lg:items-end">
           <h4 className="text-white font-black text-[11px] uppercase tracking-[0.4em]">КОНТАКТЫ</h4>
-          <div className="flex flex-col lg:items-end gap-2 text-[13px] font-bold text-zinc-500">
-             <span>support@modnex.project</span>
-             <span>abuse@modnex.project</span>
+          <div className="flex flex-col lg:items-end gap-2 text-[13px] font-bold text-zinc-500 leading-relaxed uppercase tracking-tight">
+            <span>support@modnex.project</span>
+            <span>abuse@modnex.project</span>
+            <span className="mt-4 opacity-40 text-[9px]">г. Москва, ул. Цифровая, д. 404<br />БЦ "Моднекс Хаб"</span>
           </div>
         </div>
 

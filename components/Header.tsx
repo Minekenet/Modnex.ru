@@ -1,9 +1,10 @@
-
-import React, { useState, useRef, memo } from 'react';
+import React, { useState, useRef, memo, useEffect } from 'react';
 import * as ReactRouterDOM from 'react-router-dom';
 import { GAMES_DATA } from '../constants';
+import { gamesService } from '../api/games';
+import { Game } from '../types';
 
-type MenuType = 'games' | 'authors' | 'community' | 'help' | null;
+type MenuType = 'games' | 'authors' | 'community' | 'help' | 'notifications' | null;
 
 const GameSearchInput = memo(({ value, onChange }: { value: string, onChange: (val: string) => void }) => (
   <div className="relative group">
@@ -12,8 +13,8 @@ const GameSearchInput = memo(({ value, onChange }: { value: string, onChange: (v
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
       </svg>
     </div>
-    <input 
-      type="text" 
+    <input
+      type="text"
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder="ПОИСК ПО ИГРАМ..."
@@ -26,14 +27,42 @@ const GameSearchInput = memo(({ value, onChange }: { value: string, onChange: (v
 const Header: React.FC = () => {
   const [activeMenu, setActiveMenu] = useState<MenuType>(null);
   const [gameSearch, setGameSearch] = useState('');
+  const [games, setGames] = useState<Game[]>([]);
+  const [user, setUser] = useState<any>(null);
   const timeoutRef = useRef<number | null>(null);
 
-  // Используем slug для ссылок
-  const navGames = GAMES_DATA.map(game => ({
+  useEffect(() => {
+    const fetchUser = () => {
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        setUser(JSON.parse(storedUser));
+      }
+    };
+    fetchUser();
+
+    // Listen for storage changes (optional but good for login/logout)
+    window.addEventListener('storage', fetchUser);
+    return () => window.removeEventListener('storage', fetchUser);
+  }, []);
+
+  React.useEffect(() => {
+    const fetchGames = async () => {
+      try {
+        const data = await gamesService.getAll();
+        setGames(data);
+      } catch (err) {
+        console.warn('Header: Failed to fetch games, using constant data', err);
+        setGames(GAMES_DATA);
+      }
+    };
+    fetchGames();
+  }, []);
+
+  const navGames = games.map(game => ({
     id: game.id,
     slug: game.slug,
     name: game.title,
-    icon: game.imageUrl
+    icon: game.imageUrl || (game as any).cover_url
   }));
 
   const authorsContent = {
@@ -81,25 +110,24 @@ const Header: React.FC = () => {
   const handleMouseLeave = () => {
     timeoutRef.current = window.setTimeout(() => {
       setActiveMenu(null);
-    }, 300); 
+    }, 300);
   };
 
   const NavItem = ({ children, active, onMouseEnter, to = "#" }: { children?: React.ReactNode, active?: boolean, onMouseEnter?: () => void, to?: string }) => (
-    <ReactRouterDOM.Link 
+    <ReactRouterDOM.Link
       to={to}
       onMouseEnter={onMouseEnter}
-      className={`px-6 h-full transition-all flex items-center gap-2 text-[13px] font-bold uppercase tracking-wider no-underline border-none bg-transparent cursor-pointer font-['Inter',_sans-serif] ${
-        active 
-        ? 'bg-white/5 text-white' 
+      className={`px-6 h-full transition-all flex items-center gap-2 text-[13px] font-bold uppercase tracking-wider no-underline border-none bg-transparent cursor-pointer font-['Inter',_sans-serif] ${active
+        ? 'bg-white/5 text-white'
         : 'text-zinc-400 hover:bg-white/5 hover:text-white'
-      }`}
+        }`}
     >
       {children}
     </ReactRouterDOM.Link>
   );
 
   const DropdownContainer = ({ children, width = "auto", padding = "p-8" }: { children?: React.ReactNode, width?: string, padding?: string }) => (
-    <div 
+    <div
       className={`absolute top-[calc(100%-1px)] left-0 bg-[#242626] shadow-[0_40px_80px_rgba(0,0,0,0.8)] ${padding} animate-in fade-in slide-in-from-top-1 duration-200 rounded-2xl z-[60] border border-white/5 font-['Inter',_sans-serif]`}
       style={{ width }}
       onMouseEnter={() => handleMouseEnter(activeMenu)}
@@ -116,9 +144,9 @@ const Header: React.FC = () => {
           <ReactRouterDOM.Link to="/" className="text-xl font-bold tracking-tighter text-white uppercase shrink-0 mr-10 hover:opacity-80 transition-opacity no-underline font-['Inter',_sans-serif]">
             MODNEX
           </ReactRouterDOM.Link>
-          
+
           <div className="h-6 w-[1px] bg-white/10 mr-6 hidden lg:block"></div>
-          
+
           <nav className="hidden lg:flex items-center h-full border-none">
             <div className="relative h-full flex items-center border-none" onMouseLeave={handleMouseLeave}>
               <NavItem active={activeMenu === 'games'} onMouseEnter={() => handleMouseEnter('games')} to="/">
@@ -135,9 +163,9 @@ const Header: React.FC = () => {
                     </div>
                     <div className="grid grid-cols-6 gap-x-4 gap-y-8 max-h-[400px] overflow-y-auto no-scrollbar min-h-[100px]">
                       {navGames.filter(g => g.name.toLowerCase().includes(gameSearch.toLowerCase())).map((game, idx) => (
-                        <ReactRouterDOM.Link 
-                          to={`/game/${game.slug}`} 
-                          key={idx} 
+                        <ReactRouterDOM.Link
+                          to={`/game/${game.slug}`}
+                          key={idx}
                           onClick={() => setActiveMenu(null)}
                           className="flex flex-col items-center gap-3 cursor-pointer text-center w-full group no-underline"
                         >
@@ -172,8 +200,8 @@ const Header: React.FC = () => {
                           <ul className="space-y-4 p-0 m-0 list-none">
                             {col.links.map((link, j) => (
                               <li key={j}>
-                                <ReactRouterDOM.Link 
-                                  to={link.to} 
+                                <ReactRouterDOM.Link
+                                  to={link.to}
                                   onClick={() => setActiveMenu(null)}
                                   className="text-zinc-400 hover:text-white transition-colors text-[13px] font-bold no-underline block uppercase tracking-wider"
                                 >
@@ -207,8 +235,8 @@ const Header: React.FC = () => {
                           <ul className="space-y-4 p-0 m-0 list-none">
                             {col.links.map((link, j) => (
                               <li key={j}>
-                                <ReactRouterDOM.Link 
-                                  to={link.to} 
+                                <ReactRouterDOM.Link
+                                  to={link.to}
                                   onClick={() => setActiveMenu(null)}
                                   className="text-zinc-400 hover:text-white transition-colors text-[13px] font-bold no-underline block uppercase tracking-wider"
                                 >
@@ -242,8 +270,8 @@ const Header: React.FC = () => {
                           <ul className="space-y-4 p-0 m-0 list-none">
                             {col.links.map((link, j) => (
                               <li key={j}>
-                                <ReactRouterDOM.Link 
-                                  to={link.to} 
+                                <ReactRouterDOM.Link
+                                  to={link.to}
                                   onClick={() => setActiveMenu(null)}
                                   className="text-zinc-400 hover:text-white transition-colors text-[13px] font-bold no-underline block uppercase tracking-wider"
                                 >
@@ -263,24 +291,90 @@ const Header: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3 border-none">
-          <button className="w-10 h-10 flex items-center justify-center bg-white/5 text-zinc-400 hover:text-white transition-all rounded-[12px] border-none cursor-pointer hover:bg-white/10 active:scale-95 outline-none">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-            </svg>
-          </button>
+          <div className="relative">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setActiveMenu(activeMenu === 'notifications' ? null : 'notifications');
+              }}
+              className={`w-10 h-10 flex items-center justify-center transition-all rounded-[12px] border-none cursor-pointer active:scale-95 outline-none ${activeMenu === 'notifications' ? 'bg-blue-600 text-white' : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'
+                }`}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+              </svg>
+              <div className={`absolute top-2 right-2 w-2 h-2 bg-blue-500 rounded-full border-2 border-[#242626] ${activeMenu === 'notifications' ? 'hidden' : ''}`}></div>
+            </button>
 
-          <button className="w-10 h-10 flex items-center justify-center bg-white/5 text-zinc-400 hover:text-white transition-all rounded-[12px] border-none cursor-pointer hover:bg-white/10 active:scale-95 outline-none">
+            {activeMenu === 'notifications' && (
+              <div
+                className="absolute top-[calc(100%+10px)] right-0 w-80 bg-[#1a1b23] shadow-2xl rounded-2xl border border-white/5 p-6 z-[100] animate-in fade-in slide-in-from-top-2 duration-200"
+                onMouseEnter={() => handleMouseEnter('notifications')}
+              >
+                <h4 className="text-[11px] font-black text-zinc-500 uppercase tracking-[0.3em] mb-4">Уведомления</h4>
+                <div className="space-y-4">
+                  <div className="flex gap-4 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors cursor-pointer group">
+                    <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0">
+                      <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                    </div>
+                    <div>
+                      <div className="text-[12px] font-bold text-white uppercase tracking-tight">Добро пожаловать!</div>
+                      <div className="text-[10px] text-zinc-500 font-bold mt-1">Твой аккаунт успешно создан. Исследуй моды прямо сейчас!</div>
+                    </div>
+                  </div>
+                  <div className="flex gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer group opacity-50">
+                    <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center shrink-0">
+                      <svg className="w-4 h-4 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    </div>
+                    <div>
+                      <div className="text-[12px] font-bold text-zinc-300 uppercase tracking-tight">Новое в Minecraft</div>
+                      <div className="text-[10px] text-zinc-600 font-bold mt-1">Посмотри свежие поступления в разделе шейдеров.</div>
+                    </div>
+                  </div>
+                </div>
+                <button className="w-full mt-6 py-3 text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] border-t border-white/5 bg-transparent hover:text-white transition-colors cursor-pointer">
+                  Очистить все
+                </button>
+              </div>
+            )}
+          </div>
+
+          <ReactRouterDOM.Link
+            to="/create-project"
+            className="w-10 h-10 flex items-center justify-center bg-white/5 text-zinc-400 hover:text-white transition-all rounded-[12px] border-none cursor-pointer hover:bg-white/10 active:scale-95 outline-none no-underline"
+          >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
             </svg>
-          </button>
-
-          <ReactRouterDOM.Link 
-            to="/auth" 
-            className="text-[12px] font-black px-8 py-2.5 rounded-full transition-all border-none bg-[#2f3131] text-white hover:bg-white/10 uppercase tracking-[0.2em] no-underline cursor-pointer active:scale-95 font-['Inter',_sans-serif] ml-2 outline-none"
-          >
-            Войти
           </ReactRouterDOM.Link>
+
+          {user ? (
+            <ReactRouterDOM.Link
+              to="/profile"
+              className="flex items-center gap-3 p-1 rounded-full hover:bg-white/5 transition-all no-underline group border-none"
+            >
+              <div className="flex flex-col items-end hidden sm:flex">
+                <span className="text-[12px] font-black text-white uppercase tracking-wider">{user.display_name || user.username}</span>
+                <span className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em]">Профиль</span>
+              </div>
+              <div className="w-10 h-10 rounded-full overflow-hidden bg-zinc-800 border-2 border-white/5 group-hover:border-white/10 transition-all shrink-0">
+                {user.avatar_url ? (
+                  <img src={user.avatar_url} className="w-full h-full object-cover" alt="" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-zinc-700 bg-[#1a1b23]">
+                    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" /></svg>
+                  </div>
+                )}
+              </div>
+            </ReactRouterDOM.Link>
+          ) : (
+            <ReactRouterDOM.Link
+              to="/auth"
+              className="text-[12px] font-black px-8 py-2.5 rounded-full transition-all border-none bg-[#2f3131] text-white hover:bg-white/10 uppercase tracking-[0.2em] no-underline cursor-pointer active:scale-95 font-['Inter',_sans-serif] ml-2 outline-none"
+            >
+              Войти
+            </ReactRouterDOM.Link>
+          )}
         </div>
       </div>
     </header>

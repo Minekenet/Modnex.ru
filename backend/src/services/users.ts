@@ -61,6 +61,37 @@ export class UserService {
         await this.db.query(query, params);
     }
 
+    async findByUsername(username: string) {
+        const query = 'SELECT id, username, display_name, email, role, avatar_url, banner_url, bio, created_at FROM users WHERE username = $1';
+        const { rows } = await this.db.query(query, [username]);
+        return rows[0];
+    }
+
+    async update(userId: string, data: { display_name?: string; bio?: string; avatar_url?: string; banner_url?: string }) {
+        const fields: string[] = [];
+        const params: any[] = [userId];
+        let paramIndex = 2;
+
+        for (const [key, value] of Object.entries(data)) {
+            if (['display_name', 'bio', 'avatar_url', 'banner_url'].includes(key)) {
+                fields.push(`${key} = $${paramIndex}`);
+                params.push(value);
+                paramIndex++;
+            }
+        }
+
+        if (fields.length === 0) return null;
+
+        const query = `
+            UPDATE users 
+            SET ${fields.join(', ')} 
+            WHERE id = $1 
+            RETURNING id, username, display_name, email, role, avatar_url, banner_url, bio
+        `;
+        const { rows } = await this.db.query(query, params);
+        return rows[0];
+    }
+
     async findByEmail(email: string) {
         const query = 'SELECT * FROM users WHERE email = $1';
         const { rows } = await this.db.query(query, [email]);
@@ -72,5 +103,36 @@ export class UserService {
         const query = `SELECT * FROM users WHERE ${column} = $1`;
         const { rows } = await this.db.query(query, [id]);
         return rows[0];
+    }
+
+    async getFavorites(userId: string) {
+        const query = `
+            SELECT g.* 
+            FROM games g
+            JOIN user_favorite_games ufg ON g.id = ufg.game_id 
+            WHERE ufg.user_id = $1
+        `;
+        const { rows } = await this.db.query(query, [userId]);
+        return rows;
+    }
+
+    async addFavorite(userId: string, gameId: string) {
+        const query = `
+            INSERT INTO user_favorite_games (user_id, game_id)
+            VALUES ($1, $2)
+            ON CONFLICT DO NOTHING
+            RETURNING *
+        `;
+        const { rows } = await this.db.query(query, [userId, gameId]);
+        return rows[0];
+    }
+
+    async removeFavorite(userId: string, gameId: string) {
+        const query = `
+            DELETE FROM user_favorite_games 
+            WHERE user_id = $1 AND game_id = $2
+        `;
+        await this.db.query(query, [userId, gameId]);
+        return { success: true };
     }
 }

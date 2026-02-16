@@ -1,8 +1,8 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import GameCard from './GameCard';
-import { GAMES_DATA } from '../constants';
 import { gamesService } from '../api/games';
+import Skeleton from './UI/Skeleton';
 
 interface GamesSectionProps {
   onSuggestClick: () => void;
@@ -14,7 +14,8 @@ const GamesSection: React.FC<GamesSectionProps> = ({ onSuggestClick, favorites, 
   const [sortBy, setSortBy] = useState('ПОПУЛЯРНЫЕ');
   const [isSortOpen, setIsSortOpen] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
-  const [games, setGames] = useState<any[]>(GAMES_DATA);
+  const [games, setGames] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const sortOptions = ['ПОПУЛЯРНЫЕ', 'КОЛИЧЕСТВО МОДОВ', 'ИЗБРАННЫЕ'];
 
@@ -30,22 +31,24 @@ const GamesSection: React.FC<GamesSectionProps> = ({ onSuggestClick, favorites, 
   useEffect(() => {
     const fetchGames = async () => {
       try {
+        setLoading(true);
         const data = await gamesService.getAll();
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data)) {
           const mapped = data.map(g => {
-            const local = GAMES_DATA.find(l => l.slug === g.slug);
             const stats = typeof g.stats === 'string' ? JSON.parse(g.stats) : (g.stats || {});
             return {
               ...g,
-              imageUrl: g.cover_url || local?.imageUrl || '',
-              modCount: stats.modCount || local?.modCount || '0',
-              downloadCount: stats.downloads || local?.downloadCount || '0'
+              imageUrl: g.cover_url || '',
+              modCount: stats.modCount || '0',
+              downloadCount: stats.downloads || '0'
             };
           });
           setGames(mapped);
         }
       } catch (err) {
-        console.warn('API fetch failed, using local data', err);
+        console.error('API fetch failed for games', err);
+      } finally {
+        setLoading(false);
       }
     };
     fetchGames();
@@ -105,7 +108,17 @@ const GamesSection: React.FC<GamesSectionProps> = ({ onSuggestClick, favorites, 
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-6 gap-y-12 mb-20 min-h-[300px] mt-12">
-        {displayedGames.map((game) => (
+        {loading ? (
+          Array.from({ length: 10 }).map((_, i) => (
+            <div key={i} className="flex flex-col gap-4">
+              <Skeleton className="w-full aspect-[4/5] rounded-2xl" />
+              <div className="space-y-2">
+                <Skeleton className="w-3/4 h-4" />
+                <Skeleton className="w-1/2 h-3" />
+              </div>
+            </div>
+          ))
+        ) : displayedGames.map((game) => (
           <GameCard
             key={game.id}
             game={game}
