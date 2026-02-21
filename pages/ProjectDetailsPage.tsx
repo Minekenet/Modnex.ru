@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import * as ReactRouterDOM from 'react-router-dom';
 import SidebarCreators from '../components/ModDetails/SidebarCreators';
 import SidebarDetails from '../components/ModDetails/SidebarDetails';
@@ -8,11 +8,13 @@ import { DetailsLayoutMapper } from '../components/ModDetails/DetailsLayoutMappe
 import { projectsService } from '../api/projects';
 import { gamesService } from '../api/games';
 import { filesService } from '../api/files';
+import { reportsService } from '../api/reports';
 import { Project } from '../types';
 
-const ReportModal: React.FC<{ isOpen: boolean; onClose: () => void; modTitle: string }> = ({ isOpen, onClose, modTitle }) => {
+const ReportModal: React.FC<{ isOpen: boolean; onClose: () => void; modTitle: string; itemId: string }> = ({ isOpen, onClose, modTitle, itemId }) => {
   const [reason, setReason] = useState('');
   const [comment, setComment] = useState('');
+  const [loading, setLoading] = useState(false);
 
   if (!isOpen) return null;
 
@@ -24,16 +26,33 @@ const ReportModal: React.FC<{ isOpen: boolean; onClose: () => void; modTitle: st
     'Спам / Обман'
   ];
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setLoading(true);
+      await reportsService.create({ item_id: itemId, reason, comment: comment.trim() || undefined });
+      onClose();
+      setReason('');
+      setComment('');
+      alert('Ваша жалоба отправлена на рассмотрение.');
+    } catch (err) {
+      console.error(err);
+      alert('Не удалось отправить жалобу. Попробуйте позже.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-[700] flex items-center justify-center p-6">
       <div className="absolute inset-0 bg-black/90" onClick={onClose}></div>
       <div className="relative bg-[#24262b] w-full max-w-md rounded-3xl overflow-hidden shadow-2xl p-10 border border-white/5 animate-in zoom-in-95 duration-200">
         <h2 className="text-2xl font-black uppercase tracking-tight mb-2 text-white">Жалоба</h2>
-        <p className="text-zinc-500 text-sm font-medium mb-8 uppercase tracking-wide">Проект: {modTitle}</p>
+        <p className="text-white/80 text-sm font-medium mb-8 uppercase tracking-wide">Проект: {modTitle}</p>
 
-        <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); alert('Ваша жалоба отправлена на рассмотрение.'); onClose(); }}>
+        <form className="space-y-6" onSubmit={handleSubmit}>
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">Причина</label>
+            <label className="text-[10px] font-black text-white uppercase tracking-widest">Причина</label>
             <select
               required
               value={reason}
@@ -45,7 +64,7 @@ const ReportModal: React.FC<{ isOpen: boolean; onClose: () => void; modTitle: st
             </select>
           </div>
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">Дополнительно</label>
+            <label className="text-[10px] font-black text-white uppercase tracking-widest">Дополнительно</label>
             <textarea
               rows={3}
               placeholder="Опишите проблему подробнее..."
@@ -56,7 +75,7 @@ const ReportModal: React.FC<{ isOpen: boolean; onClose: () => void; modTitle: st
           </div>
           <div className="flex gap-4">
             <button type="button" onClick={onClose} className="flex-grow bg-white/5 text-white font-black py-4 rounded-xl uppercase tracking-widest text-[11px] border-none cursor-pointer hover:bg-white/10 transition-all">Отмена</button>
-            <button type="submit" className="flex-grow bg-red-600 text-white font-black py-4 rounded-xl uppercase tracking-widest text-[11px] border-none cursor-pointer hover:bg-red-500 transition-all shadow-lg">Отправить</button>
+            <button type="submit" disabled={loading} className="flex-grow bg-red-600 text-white font-black py-4 rounded-xl uppercase tracking-widest text-[11px] border-none cursor-pointer hover:bg-red-500 transition-all shadow-lg disabled:opacity-50">{loading ? 'Отправка...' : 'Отправить'}</button>
           </div>
         </form>
       </div>
@@ -77,42 +96,40 @@ const ProjectDetailsPage: React.FC = () => {
 
   const [game, setGame] = useState<any>(null);
 
-  useEffect(() => {
-    const fetchProject = async () => {
-      if (!gameSlug || !projectSlug) return;
+  const fetchProject = useCallback(async (showLoader = true) => {
+    if (!gameSlug || !projectSlug) return;
+    try {
+      if (showLoader) setLoading(true);
+      const data = await projectsService.getBySlug(gameSlug, categorySlug || 'mods', projectSlug);
+      setProject(data);
+
       try {
-        setLoading(true);
-        const data = await projectsService.getBySlug(gameSlug, categorySlug || 'mods', projectSlug);
-        setProject(data);
-
-        // Fetch game info for config
-        try {
-          const gameData = await gamesService.getBySlug(gameSlug);
-          setGame(gameData);
-        } catch (gameErr) {
-          console.error('Failed to fetch game for project:', gameErr);
-        }
-
-        // Fetch files
-        try {
-          const filesData = await filesService.listVersions(data.id);
-          setFiles(filesData);
-        } catch (fileErr) {
-          console.error('Failed to fetch files:', fileErr);
-        }
-
-        setError(null);
-      } catch (err) {
-        console.error('Failed to fetch project:', err);
-        setError('Проект не найден');
-      } finally {
-        setLoading(false);
+        const gameData = await gamesService.getBySlug(gameSlug);
+        setGame(gameData);
+      } catch (gameErr) {
+        console.error('Failed to fetch game for project:', gameErr);
       }
-    };
 
-    fetchProject();
-    window.scrollTo(0, 0);
+      try {
+        const filesData = await filesService.listVersions(data.id);
+        setFiles(filesData);
+      } catch (fileErr) {
+        console.error('Failed to fetch files:', fileErr);
+      }
+
+      setError(null);
+    } catch (err) {
+      console.error('Failed to fetch project:', err);
+      setError('Проект не найден');
+    } finally {
+      if (showLoader) setLoading(false);
+    }
   }, [gameSlug, categorySlug, projectSlug]);
+
+  useEffect(() => {
+    fetchProject(true);
+    window.scrollTo(0, 0);
+  }, [fetchProject]);
 
   const modData = useMemo(() => {
     if (!project) return null;
@@ -148,6 +165,14 @@ const ProjectDetailsPage: React.FC = () => {
 
   const slugify = (text: string) => text.toLowerCase().replace(/\s+/g, '-');
 
+  const sectionSlug = categorySlug || 'mods';
+  const fileSchema = useMemo(() => {
+    const sections = (game as any)?.sections ?? [];
+    const section = sections.find((s: any) => s.slug === sectionSlug);
+    const ui = section?.ui_config;
+    return (ui?.file_schema ?? []) as { key: string; label: string; type: string; required?: boolean; options?: { value: string; label: string }[] }[];
+  }, [game, sectionSlug]);
+
   const detailsType = useMemo(() => {
     if (!game) return 'standard';
 
@@ -179,8 +204,8 @@ const ProjectDetailsPage: React.FC = () => {
   if (error || !modData) return <div className="min-h-screen bg-[#1c1c1f] flex items-center justify-center text-white font-black uppercase tracking-widest">{error || 'Проект не найден'}</div>;
 
   return (
-    <div className="min-h-screen bg-[#1c1c1f] text-zinc-300 pb-32 font-['Inter',_sans-serif]">
-      <button onClick={() => setIsOwner(!isOwner)} className="fixed bottom-4 left-4 z-[100] bg-white/5 text-[9px] px-3 py-1 rounded-full border-none cursor-pointer hover:bg-white/10 transition-all text-zinc-600 uppercase font-black">{isOwner ? 'Режим: Владелец' : 'Режим: Гость'}</button>
+    <div className="min-h-screen bg-[#1c1c1f] text-white pb-32 font-['Inter',_sans-serif]">
+      <button onClick={() => setIsOwner(!isOwner)} className="fixed bottom-4 left-4 z-[100] bg-white/5 text-[9px] px-3 py-1 rounded-full border-none cursor-pointer hover:bg-white/10 transition-all text-white/80 uppercase font-black">{isOwner ? 'Режим: Владелец' : 'Режим: Гость'}</button>
 
       <div className="bg-[#1c1c1f] py-14">
         <div className="max-w-[1300px] mx-auto px-8 flex flex-col md:flex-row gap-12">
@@ -193,18 +218,18 @@ const ProjectDetailsPage: React.FC = () => {
             <div className="mb-4">
               <h1 className="text-5xl font-black text-white uppercase tracking-tight m-0 leading-tight">{modData.title}</h1>
               <div className="flex items-center gap-4 mt-2">
-                <span className="text-[12px] font-black text-zinc-500 uppercase tracking-[0.3em]">Автор: {modData.author}</span>
-                <div className="w-1.5 h-1.5 bg-zinc-800 rounded-full"></div>
-                <ReactRouterDOM.Link to={`/game/${game?.slug}`} className="text-[12px] font-black text-zinc-500 uppercase tracking-[0.3em] no-underline hover:text-white transition-colors">{modData.gameName}</ReactRouterDOM.Link>
+                <span className="text-[12px] font-black text-white/80 uppercase tracking-[0.3em]">Автор: {modData.author}</span>
+                <div className="w-1.5 h-1.5 bg-white/30 rounded-full"></div>
+                <ReactRouterDOM.Link to={`/game/${game?.slug}`} className="text-[12px] font-black text-white/80 uppercase tracking-[0.3em] no-underline hover:text-white transition-colors">{modData.gameName}</ReactRouterDOM.Link>
               </div>
             </div>
-            <p className="text-zinc-400 text-lg font-medium leading-relaxed max-w-2xl mb-8">{modData.description}</p>
+            <p className="text-white/90 text-lg font-medium leading-relaxed max-w-2xl mb-8">{modData.description}</p>
             <div className="flex flex-wrap items-center gap-8 text-[14px] font-bold">
-              <span className="text-zinc-500 flex items-center gap-2">Downloads: <span className="text-zinc-300">{modData.stats.downloads}</span></span>
-              <span className="text-zinc-500 flex items-center gap-2">Likes: <span className="text-zinc-300">{modData.stats.likes}</span></span>
+              <span className="text-white/70 flex items-center gap-2">Downloads: <span className="text-white">{modData.stats.downloads}</span></span>
+              <span className="text-white/70 flex items-center gap-2">Likes: <span className="text-white">{modData.stats.likes}</span></span>
               <button
                 onClick={() => setIsReportOpen(true)}
-                className="flex items-center gap-2 text-zinc-600 hover:text-red-500 transition-colors uppercase tracking-widest text-[11px] font-black bg-transparent border-none cursor-pointer ml-auto"
+                className="flex items-center gap-2 text-white/70 hover:text-red-400 transition-colors uppercase tracking-widest text-[11px] font-black bg-transparent border-none cursor-pointer ml-auto"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
                 Пожаловаться
@@ -223,9 +248,22 @@ const ProjectDetailsPage: React.FC = () => {
         isOwner={isOwner}
         tabs={tabs}
         modId={modData.id}
+        gameSlug={gameSlug}
+        sectionSlug={sectionSlug}
+        projectSlug={projectSlug}
+        fileSchema={fileSchema}
+        onUpdateProject={gameSlug && projectSlug ? async (data) => {
+          await projectsService.update(gameSlug, sectionSlug, projectSlug, data);
+          fetchProject(false);
+        } : undefined}
+        onUploadVersion={project?.id ? async (file, version, extraData) => {
+          await filesService.uploadVersion(project.id, version, file, '', extraData);
+          fetchProject(false);
+        } : undefined}
+        onReload={() => fetchProject(false)}
       />
 
-      <ReportModal isOpen={isReportOpen} onClose={() => setIsReportOpen(false)} modTitle={modData.title} />
+      <ReportModal isOpen={isReportOpen} onClose={() => setIsReportOpen(false)} modTitle={modData.title} itemId={modData.id} />
 
       {selectedImageIndex !== null && (
         <div
@@ -262,7 +300,7 @@ const ProjectDetailsPage: React.FC = () => {
               />
             </div>
             <div className="mt-8 flex items-center gap-6">
-              <span className="text-zinc-600 font-black uppercase text-[10px] tracking-[0.5em]">
+              <span className="text-white/80 font-black uppercase text-[10px] tracking-[0.5em]">
                 {selectedImageIndex + 1} / {modData.gallery.length}
               </span>
             </div>

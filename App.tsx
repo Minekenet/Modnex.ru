@@ -13,6 +13,7 @@ import InfoPage from './pages/InfoPage';
 import KnowledgeBasePage from './pages/KnowledgeBasePage';
 import CreateProjectPage from './pages/CreateProjectPage';
 import SupportChat from './components/SupportChat';
+import AdminPage from './pages/AdminPage';
 
 import { usersService } from './api/users';
 
@@ -69,92 +70,41 @@ const CookieBanner = () => {
   );
 };
 
+import { useAuthStore } from './stores/authStore';
+import { useFavoritesStore } from './stores/favoritesStore';
+
 const App: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [favorites, setFavorites] = useState<string[]>([]);
-  const [hasTicket, setHasTicket] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('token'));
 
-  // Initial favorites load
+  const { isLoggedIn, checkAuth } = useAuthStore();
+  const { favorites, loadFavorites, toggleFavorite, syncFavorites } = useFavoritesStore();
+
   useEffect(() => {
-    const loadFavorites = async () => {
-      const token = localStorage.getItem('token');
-      if (token) {
-        try {
-          const favs = await usersService.getFavorites();
-          setFavorites(favs.map((f: any) => f.id));
-        } catch (err) {
-          console.error('Failed to load DB favorites', err);
-          // Fallback to local
-          const localFavs = JSON.parse(localStorage.getItem('favorites') || '[]');
-          setFavorites(localFavs);
-        }
-      } else {
-        const localFavs = JSON.parse(localStorage.getItem('favorites') || '[]');
-        setFavorites(localFavs);
-      }
-    };
-    loadFavorites();
+    checkAuth();
+    loadFavorites(isLoggedIn);
 
-    const checkStatus = () => {
-      setIsLoggedIn(!!localStorage.getItem('token'));
-      loadFavorites();
+    const onAuthChange = () => {
+      checkAuth();
+      loadFavorites(!!localStorage.getItem('token'));
     };
 
-    window.addEventListener('storage', checkStatus);
-    window.addEventListener('auth_state_changed', checkStatus);
+    window.addEventListener('storage', onAuthChange);
+    window.addEventListener('auth_state_changed', onAuthChange);
     return () => {
-      window.removeEventListener('storage', checkStatus);
-      window.removeEventListener('auth_state_changed', checkStatus);
+      window.removeEventListener('storage', onAuthChange);
+      window.removeEventListener('auth_state_changed', onAuthChange);
     };
   }, []);
 
-  // Sync guest favorites to DB on login
   useEffect(() => {
     if (isLoggedIn) {
-      const localFavs = JSON.parse(localStorage.getItem('favorites') || '[]');
-      if (localFavs.length > 0) {
-        const syncFavs = async () => {
-          for (const gameId of localFavs) {
-            try {
-              await usersService.addFavorite(gameId);
-            } catch (e) {
-              console.warn('Sync failed for item', gameId);
-            }
-          }
-          localStorage.removeItem('favorites');
-          // Refresh list from DB
-          const favs = await usersService.getFavorites();
-          setFavorites(favs.map((f: any) => f.id));
-        };
-        syncFavs();
-      }
+      syncFavorites();
     }
   }, [isLoggedIn]);
 
-  const toggleFavorite = async (gameId: string) => {
-    const isAdding = !favorites.includes(gameId);
-
-    // Update local state first for instant UI response
-    setFavorites(prev => isAdding ? [...prev, gameId] : prev.filter(id => id !== gameId));
-
-    if (isLoggedIn) {
-      try {
-        if (isAdding) {
-          await usersService.addFavorite(gameId);
-        } else {
-          await usersService.removeFavorite(gameId);
-        }
-      } catch (err) {
-        console.error('Failed to sync favorite with DB', err);
-        // Rollback state if desired
-      }
-    } else {
-      const localFavs = JSON.parse(localStorage.getItem('favorites') || '[]');
-      const nextFavs = isAdding ? [...localFavs, gameId] : localFavs.filter((id: string) => id !== gameId);
-      localStorage.setItem('favorites', JSON.stringify(nextFavs));
-    }
+  const handleToggleFavorite = (gameId: string) => {
+    toggleFavorite(gameId, isLoggedIn);
   };
 
   return (
@@ -169,7 +119,7 @@ const App: React.FC = () => {
               <HomePage
                 onSuggestClick={() => setIsModalOpen(true)}
                 favorites={favorites}
-                onToggleFavorite={toggleFavorite}
+                onToggleFavorite={handleToggleFavorite}
               />
             }
           />
@@ -177,13 +127,13 @@ const App: React.FC = () => {
           <ReactRouterDOM.Route path="/profile" element={<ProfilePage />} />
           <ReactRouterDOM.Route path="/user/:username" element={<ProfilePage />} />
 
-          {/* SEO Optimized Routes */}
+          {/* SEO Optimized Routes - Human-readable URLs */}
           <ReactRouterDOM.Route
             path="/game/:gameSlug"
             element={
               <GamePage
                 favorites={favorites}
-                onToggleFavorite={toggleFavorite}
+                onToggleFavorite={handleToggleFavorite}
               />
             }
           />
@@ -192,11 +142,12 @@ const App: React.FC = () => {
             element={
               <GamePage
                 favorites={favorites}
-                onToggleFavorite={toggleFavorite}
+                onToggleFavorite={handleToggleFavorite}
               />
             }
           />
-          <ReactRouterDOM.Route path="/game/:gameSlug/project/:projectSlug" element={<ProjectDetailsPage />} />
+          {/* New format: /game/:gameSlug/:categorySlug/:projectSlug (removed /project/) */}
+          <ReactRouterDOM.Route path="/game/:gameSlug/:categorySlug/:projectSlug" element={<ProjectDetailsPage />} />
 
           <ReactRouterDOM.Route path="/privacy" element={<InfoPage type="privacy" />} />
           <ReactRouterDOM.Route path="/rules" element={<InfoPage type="rules" />} />
@@ -206,6 +157,7 @@ const App: React.FC = () => {
 
           <ReactRouterDOM.Route path="/faq" element={<KnowledgeBasePage />} />
           <ReactRouterDOM.Route path="/create-project" element={<CreateProjectPage />} />
+          <ReactRouterDOM.Route path="/admin" element={<AdminPage />} />
 
           <ReactRouterDOM.Route path="*" element={<ReactRouterDOM.Navigate to="/" replace />} />
         </ReactRouterDOM.Routes>
@@ -216,8 +168,8 @@ const App: React.FC = () => {
       <SupportChat isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
       <CookieBanner />
 
-      {/* Плавающая кнопка чата поддержки */}
-      {hasTicket && (
+      {/* Плавающая кнопка чата поддержки (для авторизованных) */}
+      {isLoggedIn && (
         <div className="fixed bottom-8 right-8 z-[90] animate-in fade-in slide-in-from-bottom-8 duration-500">
           <button
             onClick={() => setIsChatOpen(!isChatOpen)}

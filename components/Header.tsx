@@ -24,25 +24,21 @@ const GameSearchInput = memo(({ value, onChange }: { value: string, onChange: (v
   </div>
 ));
 
+import { useAuthStore } from '../stores/authStore';
+import { notificationsService, Notification } from '../api/notifications';
+
 const Header: React.FC = () => {
+  const navigate = ReactRouterDOM.useNavigate();
+  const { isLoggedIn, user, logout } = useAuthStore();
   const [activeMenu, setActiveMenu] = useState<MenuType>(null);
   const [gameSearch, setGameSearch] = useState('');
   const [games, setGames] = useState<Game[]>([]);
-  const [user, setUser] = useState<any>(null);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const timeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const fetchUser = () => {
-      const storedUser = localStorage.getItem('user');
-      if (storedUser) {
-        setUser(JSON.parse(storedUser));
-      }
-    };
-    fetchUser();
-
-    // Listen for storage changes (optional but good for login/logout)
-    window.addEventListener('storage', fetchUser);
-    return () => window.removeEventListener('storage', fetchUser);
+    // Auth state is now managed by useAuthStore
   }, []);
 
   React.useEffect(() => {
@@ -57,6 +53,38 @@ const Header: React.FC = () => {
     };
     fetchGames();
   }, []);
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setNotifications([]);
+      setUnreadCount(0);
+      return;
+    }
+    notificationsService.getUnreadCount().then(setUnreadCount).catch(() => {});
+  }, [isLoggedIn]);
+
+  const openNotifications = () => {
+    if (activeMenu === 'notifications') {
+      setActiveMenu(null);
+      return;
+    }
+    setActiveMenu('notifications');
+    if (isLoggedIn) {
+      notificationsService.getList().then(setNotifications).catch(() => setNotifications([]));
+      notificationsService.getUnreadCount().then(setUnreadCount).catch(() => {});
+    }
+  };
+
+  const markAllNotificationsRead = async () => {
+    if (!isLoggedIn) return;
+    try {
+      await notificationsService.markAllRead();
+      setUnreadCount(0);
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const navGames = games.map(game => ({
     id: game.id,
@@ -295,7 +323,7 @@ const Header: React.FC = () => {
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                setActiveMenu(activeMenu === 'notifications' ? null : 'notifications');
+                openNotifications();
               }}
               className={`w-10 h-10 flex items-center justify-center transition-all rounded-[12px] border-none cursor-pointer active:scale-95 outline-none ${activeMenu === 'notifications' ? 'bg-blue-600 text-white' : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'
                 }`}
@@ -303,7 +331,11 @@ const Header: React.FC = () => {
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
               </svg>
-              <div className={`absolute top-2 right-2 w-2 h-2 bg-blue-500 rounded-full border-2 border-[#242626] ${activeMenu === 'notifications' ? 'hidden' : ''}`}></div>
+              {unreadCount > 0 && (
+                <div className="absolute top-1.5 right-1.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center bg-blue-500 rounded-full border-2 border-[#242626] text-[10px] font-black text-white">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </div>
+              )}
             </button>
 
             {activeMenu === 'notifications' && (
@@ -312,41 +344,59 @@ const Header: React.FC = () => {
                 onMouseEnter={() => handleMouseEnter('notifications')}
               >
                 <h4 className="text-[11px] font-black text-zinc-500 uppercase tracking-[0.3em] mb-4">Уведомления</h4>
-                <div className="space-y-4">
-                  <div className="flex gap-4 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors cursor-pointer group">
-                    <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0">
-                      <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                {!isLoggedIn ? (
+                  <p className="text-zinc-500 text-sm">Войдите, чтобы видеть уведомления.</p>
+                ) : (
+                  <>
+                    <div className="space-y-4 max-h-[320px] overflow-y-auto no-scrollbar">
+                      {notifications.length === 0 ? (
+                        <p className="text-zinc-500 text-[12px] font-medium">Нет уведомлений.</p>
+                      ) : (
+                        notifications.map((n) => (
+                          <div
+                            key={n.id}
+                            className={`flex gap-4 p-3 rounded-xl transition-colors ${!n.is_read ? 'bg-white/5' : ''} hover:bg-white/10 cursor-default`}
+                          >
+                            <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0">
+                              <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-[12px] font-bold text-white leading-snug">{n.message}</div>
+                              <div className="text-[10px] text-zinc-500 font-bold mt-1">{new Date(n.created_at).toLocaleDateString('ru-RU')}</div>
+                            </div>
+                          </div>
+                        ))
+                      )}
                     </div>
-                    <div>
-                      <div className="text-[12px] font-bold text-white uppercase tracking-tight">Добро пожаловать!</div>
-                      <div className="text-[10px] text-zinc-500 font-bold mt-1">Твой аккаунт успешно создан. Исследуй моды прямо сейчас!</div>
-                    </div>
-                  </div>
-                  <div className="flex gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer group opacity-50">
-                    <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center shrink-0">
-                      <svg className="w-4 h-4 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    </div>
-                    <div>
-                      <div className="text-[12px] font-bold text-zinc-300 uppercase tracking-tight">Новое в Minecraft</div>
-                      <div className="text-[10px] text-zinc-600 font-bold mt-1">Посмотри свежие поступления в разделе шейдеров.</div>
-                    </div>
-                  </div>
-                </div>
-                <button className="w-full mt-6 py-3 text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] border-t border-white/5 bg-transparent hover:text-white transition-colors cursor-pointer">
-                  Очистить все
-                </button>
+                    {notifications.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={markAllNotificationsRead}
+                        className="w-full mt-6 py-3 text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] border-t border-white/5 bg-transparent hover:text-white transition-colors cursor-pointer"
+                      >
+                        Прочитать все
+                      </button>
+                    )}
+                  </>
+                )}
               </div>
             )}
           </div>
 
-          <ReactRouterDOM.Link
-            to="/create-project"
-            className="w-10 h-10 flex items-center justify-center bg-white/5 text-zinc-400 hover:text-white transition-all rounded-[12px] border-none cursor-pointer hover:bg-white/10 active:scale-95 outline-none no-underline"
+          <button
+            onClick={() => {
+              if (isLoggedIn) {
+                navigate('/create-project');
+              } else {
+                navigate('/auth');
+              }
+            }}
+            className="w-10 h-10 flex items-center justify-center bg-white/5 text-zinc-400 hover:text-white transition-all rounded-[12px] border-none cursor-pointer hover:bg-white/10 active:scale-95 outline-none"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
             </svg>
-          </ReactRouterDOM.Link>
+          </button>
 
           {user ? (
             <ReactRouterDOM.Link
