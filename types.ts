@@ -2,6 +2,8 @@
 export interface FilterOption {
   label: string;
   options: string[];
+  is_preview?: boolean;
+  preview_limit?: number;
 }
 
 export interface Game {
@@ -28,9 +30,12 @@ export type CreationType = 'standard' | 'skin' | 'simple';
 
 export interface SectionConfig {
   viewType?: ViewType;
+  allowed_layouts?: ('grid' | 'compact' | 'list' | 'skin')[];
   detailsType?: DetailsType;
   creationType?: CreationType;
   defaultViewMode?: 'grid' | 'compact' | 'list';
+  badgeFields?: string[];
+  badgeMax?: number;
 }
 
 export interface Project {

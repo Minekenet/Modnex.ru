@@ -55,8 +55,11 @@ export default async function filesRoutes(server: FastifyInstance) {
 
             const query = request.query as any;
             if (!query.version) return reply.code(400).send({ error: 'Missing version in query params' });
-
-            const fileRecord = await fileService.uploadVersion(itemId, query.version, data, query.changelog);
+            const extraData: Record<string, string> = {};
+            Object.keys(query).forEach(k => {
+                if (!['version', 'changelog'].includes(k) && query[k] != null) extraData[k] = String(query[k]);
+            });
+            const fileRecord = await fileService.uploadVersion(itemId, query.version, data, query.changelog, Object.keys(extraData).length ? extraData : undefined);
             return fileRecord;
 
         } catch (err) {
@@ -86,6 +89,25 @@ export default async function filesRoutes(server: FastifyInstance) {
         try {
             const files = await fileService.listVersions(itemId);
             return files;
+        } catch (err) {
+            server.log.error(err);
+            return reply.code(500).send({ error: 'Internal Server Error' });
+        }
+    });
+
+    // Upload Gallery Image (Auth Required)
+    server.post('/items/:itemId/gallery', {
+        onRequest: [async (request) => await request.jwtVerify()]
+    }, async (request, reply) => {
+        const { itemId } = request.params as any;
+        const query = request.query as any;
+        try {
+            const file = await request.file();
+            if (!file) return reply.code(400).send({ error: 'No file uploaded' });
+
+            const isPrimary = query.primary === 'true';
+            const record = await fileService.uploadGalleryImage(itemId, file, isPrimary);
+            return record;
         } catch (err) {
             server.log.error(err);
             return reply.code(500).send({ error: 'Internal Server Error' });

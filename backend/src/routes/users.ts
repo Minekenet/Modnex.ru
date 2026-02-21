@@ -89,4 +89,19 @@ export default async function usersRoutes(server: FastifyInstance) {
             return reply.code(500).send({ error: 'Internal Server Error' });
         }
     });
+
+    // Merge favorites endpoint
+    server.post('/users/me/favorites/merge', {
+        onRequest: [async (request) => await request.jwtVerify()]
+    }, async (request, reply) => {
+        const user = request.user as any;
+        const { gameIds } = request.body as { gameIds: string[] };
+        try {
+            const merged = await userService.mergeFavorites(user.id, gameIds || []);
+            return merged;
+        } catch (err) {
+            server.log.error(err);
+            return reply.code(500).send({ error: 'Internal Server Error' });
+        }
+    });
 }

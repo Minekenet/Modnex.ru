@@ -7,10 +7,11 @@ export class ItemService {
         this.db = db;
     }
 
-    async create(data: { section_id: string; author_id: string; title: string; slug: string; summary: string; description: string; attributes: any }) {
+    async create(data: { section_id: string; author_id: string; title: string; slug: string; summary: string; description: string; attributes: any; links?: any[]; status?: string }) {
+        const status = data.status && ['draft', 'published', 'hidden', 'archived'].includes(data.status) ? data.status : 'draft';
         const query = `
-      INSERT INTO items (section_id, author_id, title, slug, summary, description, attributes)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      INSERT INTO items (section_id, author_id, title, slug, summary, description, attributes, links, status)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *
     `;
         const { rows } = await this.db.query(query, [
@@ -20,8 +21,43 @@ export class ItemService {
             data.slug,
             data.summary,
             data.description,
-            JSON.stringify(data.attributes || {})
+            JSON.stringify(data.attributes || {}),
+            JSON.stringify(data.links || []),
+            status
         ]);
+        return rows[0];
+    }
+
+    async updateStatus(itemId: string, authorId: string, status: string) {
+        if (!['draft', 'published', 'hidden', 'archived'].includes(status)) return null;
+        const query = `
+      UPDATE items SET status = $1, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $2 AND author_id = $3
+      RETURNING *
+    `;
+        const { rows } = await this.db.query(query, [status, itemId, authorId]);
+        return rows[0];
+    }
+
+    async update(itemId: string, authorId: string, data: { title?: string; summary?: string; description?: string; attributes?: any; status?: string }) {
+        const updates: string[] = ['updated_at = CURRENT_TIMESTAMP'];
+        const params: any[] = [];
+        let i = 1;
+        if (data.title != null) { updates.push(`title = $${i}`); params.push(data.title); i++; }
+        if (data.summary != null) { updates.push(`summary = $${i}`); params.push(data.summary); i++; }
+        if (data.description != null) { updates.push(`description = $${i}`); params.push(data.description); i++; }
+        if (data.attributes != null) { updates.push(`attributes = $${i}`); params.push(JSON.stringify(data.attributes)); i++; }
+        if (data.status != null && ['draft', 'published', 'hidden', 'archived'].includes(data.status)) {
+            updates.push(`status = $${i}`); params.push(data.status); i++;
+        }
+        if (params.length === 0) return null;
+        params.push(itemId, authorId);
+        const query = `
+      UPDATE items SET ${updates.join(', ')}
+      WHERE id = $${i} AND author_id = $${i + 1}
+      RETURNING *
+    `;
+        const { rows } = await this.db.query(query, params);
         return rows[0];
     }
 
@@ -49,7 +85,7 @@ export class ItemService {
       JOIN sections s ON i.section_id = s.id
       JOIN games g ON s.game_id = g.id
       LEFT JOIN users u ON i.author_id = u.id
-      WHERE g.slug = $1 AND s.slug = $2
+      WHERE g.slug = $1 AND s.slug = $2 AND i.status = 'published'
     `;
 
         const params: any[] = [gameSlug, sectionSlug];

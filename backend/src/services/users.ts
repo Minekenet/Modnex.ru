@@ -62,7 +62,7 @@ export class UserService {
     }
 
     async findByUsername(username: string) {
-        const query = 'SELECT id, username, display_name, email, role, avatar_url, banner_url, bio, created_at FROM users WHERE username = $1';
+        const query = 'SELECT id, username, display_name, email, role, avatar_url, banner_url, bio, links, created_at FROM users WHERE username = $1';
         const { rows } = await this.db.query(query, [username]);
         return rows[0];
     }
@@ -73,9 +73,9 @@ export class UserService {
         let paramIndex = 2;
 
         for (const [key, value] of Object.entries(data)) {
-            if (['display_name', 'bio', 'avatar_url', 'banner_url'].includes(key)) {
+            if (['display_name', 'bio', 'avatar_url', 'banner_url', 'links'].includes(key)) {
                 fields.push(`${key} = $${paramIndex}`);
-                params.push(value);
+                params.push(key === 'links' ? JSON.stringify(value) : value);
                 paramIndex++;
             }
         }
@@ -86,7 +86,7 @@ export class UserService {
             UPDATE users 
             SET ${fields.join(', ')} 
             WHERE id = $1 
-            RETURNING id, username, display_name, email, role, avatar_url, banner_url, bio
+            RETURNING id, username, display_name, email, role, avatar_url, banner_url, bio, links
         `;
         const { rows } = await this.db.query(query, params);
         return rows[0];
@@ -114,6 +114,45 @@ export class UserService {
         `;
         const { rows } = await this.db.query(query, [userId]);
         return rows;
+    }
+
+    async mergeFavorites(userId: string, localGameIds: string[]) {
+        // Get current favorites from DB
+        const dbFavsQuery = `
+            SELECT game_id 
+            FROM user_favorite_games 
+            WHERE user_id = $1
+        `;
+        const dbFavsResult = await this.db.query(dbFavsQuery, [userId]);
+        const dbGameIds = dbFavsResult.rows.map((r: any) => r.game_id);
+
+        // Union: combine DB and local favorites, remove duplicates
+        const allGameIds = [...new Set([...dbGameIds, ...localGameIds])];
+
+        // Insert missing favorites (ON CONFLICT handles duplicates)
+        if (allGameIds.length > dbGameIds.length) {
+            const newGameIds = allGameIds.filter(id => !dbGameIds.includes(id));
+            if (newGameIds.length > 0) {
+                const values = newGameIds.map((_, idx) => `($1, $${idx + 2})`).join(', ');
+                const params = [userId, ...newGameIds];
+                const insertQuery = `
+                    INSERT INTO user_favorite_games (user_id, game_id)
+                    VALUES ${values}
+                    ON CONFLICT DO NOTHING
+                `;
+                await this.db.query(insertQuery, params);
+            }
+        }
+
+        // Return merged list
+        const mergedQuery = `
+            SELECT g.* 
+            FROM games g
+            JOIN user_favorite_games ufg ON g.id = ufg.game_id 
+            WHERE ufg.user_id = $1
+        `;
+        const mergedResult = await this.db.query(mergedQuery, [userId]);
+        return mergedResult.rows;
     }
 
     async addFavorite(userId: string, gameId: string) {

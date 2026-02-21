@@ -13,11 +13,12 @@ interface GamesSectionProps {
 const GamesSection: React.FC<GamesSectionProps> = ({ onSuggestClick, favorites, onToggleFavorite }) => {
   const [sortBy, setSortBy] = useState('ПОПУЛЯРНЫЕ');
   const [isSortOpen, setIsSortOpen] = useState(false);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
   const [games, setGames] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const sortOptions = ['ПОПУЛЯРНЫЕ', 'КОЛИЧЕСТВО МОДОВ', 'ИЗБРАННЫЕ'];
+  const sortOptions = ['ПОПУЛЯРНЫЕ', 'КОЛИЧЕСТВО МОДОВ'];
 
   const parseCount = (count: any) => {
     if (typeof count === 'number') return count;
@@ -29,11 +30,18 @@ const GamesSection: React.FC<GamesSectionProps> = ({ onSuggestClick, favorites, 
   };
 
   useEffect(() => {
+    let isCancelled = false;
+    
     const fetchGames = async () => {
       try {
         setLoading(true);
+        // Ensure games array is empty during loading to prevent flickering
+        setGames([]);
+        
         const data = await gamesService.getAll();
-        if (Array.isArray(data)) {
+        
+        // Only update if component is still mounted
+        if (!isCancelled && Array.isArray(data)) {
           const mapped = data.map(g => {
             const stats = typeof g.stats === 'string' ? JSON.parse(g.stats) : (g.stats || {});
             return {
@@ -47,26 +55,40 @@ const GamesSection: React.FC<GamesSectionProps> = ({ onSuggestClick, favorites, 
         }
       } catch (err) {
         console.error('API fetch failed for games', err);
+        if (!isCancelled) {
+          setGames([]);
+        }
       } finally {
-        setLoading(false);
+        if (!isCancelled) {
+          setLoading(false);
+        }
       }
     };
+    
     fetchGames();
+    
+    return () => {
+      isCancelled = true;
+    };
   }, []);
 
   const displayedGames = useMemo(() => {
-    let sorted = [...games];
-    if (sortBy === 'ПОПУЛЯРНЫЕ') {
-      sorted.sort((a, b) => parseCount(b.downloadCount) - parseCount(a.downloadCount));
-    } else if (sortBy === 'КОЛИЧЕСТВО МОДОВ') {
-      sorted.sort((a, b) => parseCount(b.modCount) - parseCount(a.modCount));
-    } else if (sortBy === 'ИЗБРАННЫЕ') {
-      const favorited = sorted.filter(g => favorites.includes(g.id));
-      const notFavorited = sorted.filter(g => !favorites.includes(g.id)).sort((a, b) => parseCount(b.downloadCount) - parseCount(a.downloadCount));
-      sorted = [...favorited, ...notFavorited];
+    let filtered = [...games];
+    
+    // Filter by favorites if toggle is enabled
+    if (showFavoritesOnly) {
+      filtered = filtered.filter(g => favorites.includes(g.id));
     }
-    return sorted.slice(0, 10);
-  }, [sortBy, favorites, games]);
+    
+    // Apply sorting
+    if (sortBy === 'ПОПУЛЯРНЫЕ') {
+      filtered.sort((a, b) => parseCount(b.downloadCount) - parseCount(a.downloadCount));
+    } else if (sortBy === 'КОЛИЧЕСТВО МОДОВ') {
+      filtered.sort((a, b) => parseCount(b.modCount) - parseCount(a.modCount));
+    }
+    
+    return filtered.slice(0, 10);
+  }, [sortBy, favorites, games, showFavoritesOnly]);
 
   return (
     <section className="max-w-[1400px] mx-auto px-8 pt-4 pb-16 font-['Inter',_sans-serif]">
@@ -77,7 +99,24 @@ const GamesSection: React.FC<GamesSectionProps> = ({ onSuggestClick, favorites, 
             <span className="text-zinc-500 font-bold text-[14px] uppercase tracking-[0.2em]">ПОПУЛЯРНЫЕ ИГРЫ</span>
           </div>
 
-          <div className="relative" ref={sortRef}>
+          <div className="flex items-center gap-4">
+            {/* Favorites Toggle */}
+            <button
+              onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl border-none text-[13px] font-bold transition-all cursor-pointer outline-none shadow-lg ${
+                showFavoritesOnly
+                  ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30'
+                  : 'bg-[#2f3131] text-zinc-300 hover:bg-[#3f4141]'
+              }`}
+            >
+              <svg className={`w-4 h-4 ${showFavoritesOnly ? 'fill-current' : ''}`} fill={showFavoritesOnly ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+              </svg>
+              <span className="uppercase text-[12px] font-black">Избранное</span>
+            </button>
+
+            {/* Sort Dropdown */}
+            <div className="relative" ref={sortRef}>
             <button
               onClick={() => setIsSortOpen(!isSortOpen)}
               className="flex items-center gap-4 px-6 py-2.5 bg-[#2f3131] rounded-xl border-none text-[13px] font-bold text-zinc-300 hover:bg-[#3f4141] transition-all cursor-pointer outline-none shadow-lg"
@@ -108,7 +147,8 @@ const GamesSection: React.FC<GamesSectionProps> = ({ onSuggestClick, favorites, 
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-6 gap-y-12 mb-20 min-h-[300px] mt-12">
-        {loading ? (
+        {loading || games.length === 0 ? (
+          // Show skeletons until data is fully loaded
           Array.from({ length: 10 }).map((_, i) => (
             <div key={i} className="flex flex-col gap-4">
               <Skeleton className="w-full aspect-[4/5] rounded-2xl" />
@@ -118,14 +158,16 @@ const GamesSection: React.FC<GamesSectionProps> = ({ onSuggestClick, favorites, 
               </div>
             </div>
           ))
-        ) : displayedGames.map((game) => (
-          <GameCard
-            key={game.id}
-            game={game}
-            isFavorite={favorites.includes(game.id)}
-            onToggleFavorite={onToggleFavorite}
-          />
-        ))}
+        ) : (
+          displayedGames.map((game) => (
+            <GameCard
+              key={game.id}
+              game={game}
+              isFavorite={favorites.includes(game.id)}
+              onToggleFavorite={onToggleFavorite}
+            />
+          ))
+        )}
       </div>
 
       <div className="relative overflow-hidden bg-[#242626] rounded-3xl border border-white/5 p-8 md:p-12 group transition-all shadow-xl">

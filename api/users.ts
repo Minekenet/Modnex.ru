@@ -13,7 +13,7 @@ export const usersService = {
         return data;
     },
 
-    updateProfile: async (data: { display_name?: string; bio?: string; avatar_url?: string; banner_url?: string }) => {
+    updateProfile: async (data: { display_name?: string; bio?: string; avatar_url?: string; banner_url?: string; links?: any[] }) => {
         const token = localStorage.getItem('token');
         const { data: updatedUser } = await client.put('/users/me', data, {
             headers: { Authorization: `Bearer ${token}` }
@@ -45,6 +45,11 @@ export const usersService = {
 
     removeFavorite: async (gameId: string) => {
         const { data } = await client.delete(`/users/me/favorites/${gameId}`);
+        return data;
+    },
+
+    mergeFavorites: async (gameIds: string[]) => {
+        const { data } = await client.post('/users/me/favorites/merge', { gameIds });
         return data;
     }
 };

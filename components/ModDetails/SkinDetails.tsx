@@ -4,6 +4,7 @@ import SidebarCreators from './SidebarCreators';
 import SidebarLinks from './SidebarLinks';
 import SidebarDetails from './SidebarDetails';
 import FilesTab from './FilesTab';
+import { ManageTab } from './ManageTab';
 
 interface SkinDetailsProps {
     modData: any;
@@ -12,6 +13,13 @@ interface SkinDetailsProps {
     setSelectedImageIndex: (index: number) => void;
     isOwner: boolean;
     tabs: string[];
+    gameSlug?: string;
+    sectionSlug?: string;
+    projectSlug?: string;
+    fileSchema?: { key: string; label: string; type: string; required?: boolean; options?: { value: string; label: string }[] }[];
+    onUpdateProject?: (data: { title?: string; summary?: string; description?: string; attributes?: Record<string, any>; status?: string }) => Promise<void>;
+    onUploadVersion?: (file: File, version: string, extraData?: Record<string, string>) => Promise<void>;
+    onReload?: () => void;
 }
 
 export const SkinDetails: React.FC<SkinDetailsProps> = ({
@@ -20,7 +28,14 @@ export const SkinDetails: React.FC<SkinDetailsProps> = ({
     setActiveTab,
     setSelectedImageIndex,
     isOwner,
-    tabs
+    tabs,
+    gameSlug,
+    sectionSlug,
+    projectSlug,
+    fileSchema,
+    onUpdateProject,
+    onUploadVersion,
+    onReload
 }) => {
     return (
         <div className="max-w-[1300px] mx-auto px-8 mt-12">
@@ -85,6 +100,18 @@ export const SkinDetails: React.FC<SkinDetailsProps> = ({
                                     </div>
                                 ))}
                             </div>
+                        )}
+                        {isOwner && activeTab === 'Управление' && (
+                            <ManageTab
+                                modData={modData}
+                                gameSlug={gameSlug}
+                                sectionSlug={sectionSlug}
+                                projectSlug={projectSlug}
+                                fileSchema={fileSchema}
+                                onUpdateProject={onUpdateProject}
+                                onUploadVersion={onUploadVersion}
+                                onReload={onReload}
+                            />
                         )}
                     </div>
                 </div>

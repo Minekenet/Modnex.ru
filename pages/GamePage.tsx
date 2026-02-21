@@ -55,7 +55,6 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
   }, [gameSlug]);
 
   const categories = game?.categories || [];
-  const filterGroups = game?.filters || [];
 
   // Helper to slugify category name
   const slugify = (text: string | undefined) => (text || '').toLowerCase().replace(/\s+/g, '-');
@@ -145,10 +144,6 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
     }
   };
 
-  const toggleViewMode = () => {
-    setViewMode(prev => (prev === 'grid' ? 'compact' : prev === 'compact' ? 'list' : 'grid'));
-  };
-
   const getViewModeIcon = () => {
     if (viewMode === 'grid') return <path d="M4 4h4v4H4V4zm6 0h4v4h-4V4zm6 0h4v4h-4V4zM4 10h4v4H4v-4zm6 0h4v4h-4v-4zm6 0h4v4h-4v-4zM4 16h4v4H4v-4zm6 0h4v4h-4v-4zm6 0h4v4h-4v-4z" />;
     if (viewMode === 'compact') return <path d="M3 4h18v2H3V4zm0 7h18v2H3v-2zm0 7h18v2H3v-2z" />;
@@ -192,6 +187,23 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
   const filterGroups = currentFilters;
 
   const viewType = sectionConfig.viewType || 'grid';
+  const allowedLayouts: ViewMode[] = (sectionConfig.allowed_layouts && sectionConfig.allowed_layouts.length > 0
+    ? sectionConfig.allowed_layouts.filter((l): l is ViewMode => ['grid', 'compact', 'list'].includes(l))
+    : ['grid', 'compact', 'list']) as ViewMode[];
+  const showViewToggle = allowedLayouts.length > 1;
+
+  // Keep viewMode in sync with allowed layouts when category changes
+  useEffect(() => {
+    if (allowedLayouts.length > 0 && !allowedLayouts.includes(viewMode)) {
+      setViewMode(allowedLayouts[0]);
+    }
+  }, [activeCategory]);
+
+  const toggleViewMode = () => {
+    const idx = allowedLayouts.indexOf(viewMode);
+    const nextIdx = (idx + 1) % allowedLayouts.length;
+    setViewMode(allowedLayouts[nextIdx]);
+  };
 
   return (
     <div className="min-h-screen bg-[#1c1c1f] text-white selection:bg-white selection:text-black font-['Inter',_sans-serif]">
@@ -362,12 +374,14 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
                   <option value="Newest">Sort by: Newest</option>
                   <option value="Popularity">Sort by: Popularity</option>
                 </select>
-                <button
-                  onClick={toggleViewMode}
-                  className="h-10 w-10 flex items-center justify-center bg-[#27292e] rounded-lg text-zinc-400 hover:text-white transition-all border-none cursor-pointer"
-                >
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">{getViewModeIcon()}</svg>
-                </button>
+                {showViewToggle && (
+                  <button
+                    onClick={toggleViewMode}
+                    className="h-10 w-10 flex items-center justify-center bg-[#27292e] rounded-lg text-zinc-400 hover:text-white transition-all border-none cursor-pointer"
+                  >
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">{getViewModeIcon()}</svg>
+                  </button>
+                )}
               </div>
 
               <div className="flex items-center gap-2">
@@ -411,7 +425,9 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
               ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5'
               : viewMode === 'grid'
                 ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
-                : 'grid-cols-1'
+                : viewMode === 'compact'
+                  ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'
+                  : 'grid-cols-1'
               }`}>
               {Array.from({ length: 9 }).map((_, i) => (
                 <div key={i} className={`bg-[#27292e] rounded-xl overflow-hidden border border-white/5 ${viewMode === 'list' ? 'flex items-center gap-6 p-5' : 'flex flex-col'}`}>
@@ -437,7 +453,9 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
               ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5'
               : viewMode === 'grid'
                 ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
-                : 'grid-cols-1'
+                : viewMode === 'compact'
+                  ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'
+                  : 'grid-cols-1'
               }`}>
               {projects.map((proj) => (
                 <CardViewMapper
@@ -446,7 +464,9 @@ const GamePage: React.FC<GamePageProps> = ({ favorites, onToggleFavorite }) => {
                   gameSlug={game.slug}
                   viewType={viewType}
                   viewMode={viewMode}
-                  onClick={() => navigate(`/game/${game.slug}/project/${proj.slug}`)}
+                  sectionConfig={sectionConfig}
+                  previewFilterConfig={filterGroups}
+                  onClick={() => navigate(`/game/${game.slug}/${slugify(activeCategory)}/${proj.slug}`)}
                 />
               ))}
             </div>

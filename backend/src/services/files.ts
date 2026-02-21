@@ -10,36 +10,30 @@ export class FileService {
         this.storage = storage;
     }
 
-    async uploadVersion(itemId: string, versionNumber: string, file: any, changelog?: string) {
-        // 1. Upload to S3
-        // Key format: items/{itemId}/{version}/{filename}
+    async uploadVersion(itemId: string, versionNumber: string, file: any, changelog?: string, extraData?: Record<string, string>) {
         const key = `items/${itemId}/${versionNumber}/${file.filename}`;
-        // Support both file stream and buffer (multipart file object has .file stream)
         const fileBody = file.file || file;
-
         await this.storage.uploadFile(key, fileBody, file.mimetype);
 
-        // 2. Save to Database
+        const fileData: Record<string, any> = {
+            filename: file.filename,
+            mimetype: file.mimetype,
+            encoding: file.encoding,
+            ...(extraData || {})
+        };
+
         const query = `
       INSERT INTO files (item_id, version_number, file_url, changelog, data)
       VALUES ($1, $2, $3, $4, $5)
       RETURNING *
     `;
-
-        const fileData = {
-            filename: file.filename,
-            mimetype: file.mimetype,
-            encoding: file.encoding
-        };
-
         const { rows } = await this.db.query(query, [
             itemId,
             versionNumber,
-            key, // Storing key as url for S3 retrieval
+            key,
             changelog || '',
             JSON.stringify(fileData)
         ]);
-
         return rows[0];
     }
 
@@ -65,5 +59,21 @@ export class FileService {
         const query = 'SELECT * FROM files WHERE item_id = $1 ORDER BY created_at DESC';
         const { rows } = await this.db.query(query, [itemId]);
         return rows;
+    }
+
+    async uploadGalleryImage(itemId: string, file: any, isPrimary: boolean = false) {
+        // 1. Upload to S3
+        const key = `gallery/${itemId}/${Date.now()}_${file.filename}`;
+        const fileBody = file.file || file;
+        await this.storage.uploadFile(key, fileBody, file.mimetype);
+
+        // 2. Save to Database
+        const query = `
+            INSERT INTO item_gallery (item_id, url, is_primary)
+            VALUES ($1, $2, $3)
+            RETURNING *
+        `;
+        const { rows } = await this.db.query(query, [itemId, key, isPrimary]);
+        return rows[0];
     }
 }

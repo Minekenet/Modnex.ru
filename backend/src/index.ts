@@ -1,5 +1,7 @@
 import Fastify, { FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
+import helmet from '@fastify/helmet';
+import rateLimit from '@fastify/rate-limit';
 import dotenv from 'dotenv';
 
 import db from './plugins/db';
@@ -9,6 +11,12 @@ import gamesRoutes from './routes/games';
 import itemsRoutes from './routes/items';
 import filesRoutes from './routes/files';
 import usersRoutes from './routes/users';
+import statsRoutes from './routes/stats';
+import suggestionsRoutes from './routes/suggestions';
+import reportsRoutes from './routes/reports';
+import supportRoutes from './routes/support';
+import notificationsRoutes from './routes/notifications';
+import adminRoutes from './routes/admin';
 import fastifyJwt from '@fastify/jwt';
 import fastifyMultipart from '@fastify/multipart';
 
@@ -18,8 +26,16 @@ const server: FastifyInstance = Fastify({
     logger: true
 });
 
+server.register(helmet);
+server.register(rateLimit, {
+    max: 100,
+    timeWindow: '1 minute'
+});
+
 server.register(cors, {
-    origin: '*' // Configure this appropriately for production
+    origin: process.env.NODE_ENV === 'production'
+        ? ['https://modnex.ru'] // Update with real domain
+        : true // Allow all in dev
 });
 
 server.register(fastifyMultipart, {
@@ -39,6 +55,12 @@ server.register(gamesRoutes);
 server.register(itemsRoutes);
 server.register(filesRoutes);
 server.register(usersRoutes);
+server.register(statsRoutes);
+server.register(suggestionsRoutes);
+server.register(reportsRoutes);
+server.register(supportRoutes);
+server.register(notificationsRoutes);
+server.register(adminRoutes);
 
 import { runMigrations } from './db/migrate';
 import { seedDatabase } from './db/seed';

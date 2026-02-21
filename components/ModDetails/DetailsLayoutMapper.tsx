@@ -13,6 +13,13 @@ interface DetailsLayoutMapperProps {
     isOwner: boolean;
     tabs: string[];
     modId?: string;
+    gameSlug?: string;
+    sectionSlug?: string;
+    projectSlug?: string;
+    onUpdateProject?: (data: { title?: string; summary?: string; description?: string; attributes?: Record<string, any>; status?: string }) => Promise<void>;
+    onUploadVersion?: (file: File, version: string, extraData?: Record<string, string>) => Promise<void>;
+    onReload?: () => void;
+    fileSchema?: { key: string; label: string; type: string; required?: boolean; options?: { value: string; label: string }[] }[];
 }
 
 export const DetailsLayoutMapper: React.FC<DetailsLayoutMapperProps> = ({

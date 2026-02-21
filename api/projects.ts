@@ -28,5 +28,15 @@ export const projectsService = {
         // Backend route: POST /games/:game_slug/:section_slug
         const response = await api.post(`/games/${gameSlug}/${sectionSlug}`, data);
         return response.data;
+    },
+
+    async update(gameSlug: string, sectionSlug: string, projectSlug: string, data: { title?: string; summary?: string; description?: string; attributes?: Record<string, any>; status?: string }) {
+        const response = await api.patch(`/games/${gameSlug}/${sectionSlug}/${projectSlug}`, data);
+        return response.data;
+    },
+
+    async updateStatus(gameSlug: string, sectionSlug: string, projectSlug: string, status: 'draft' | 'published' | 'hidden') {
+        const response = await api.patch(`/games/${gameSlug}/${sectionSlug}/${projectSlug}/status`, { status });
+        return response.data;
     }
 };

@@ -47,28 +47,123 @@ export async function seedDatabase(server: FastifyInstance) {
         const gameId = gameRows[0].id;
 
         for (const section of game.sections) {
+            const isMinecraftMods = game.slug === 'minecraft' && section.slug === 'mods';
+
+            const filterConfig = isMinecraftMods
+                ? [
+                    {
+                        label: 'Game versions',
+                        options: ['1.21.11', '1.21.10', '1.21.9', '1.21.8', '1.21.7', '1.21.6', '1.21.5', '1.21.4', '1.21.3', '1.21.2', '1.21.1', '1.21', '1.20.6', '1.20.5', '1.20.4', '1.20.3', '1.20.2', '1.20.1', '1.20', '1.19.4', '1.19.3', '1.19.2', '1.19.1', '1.19', '1.18.2', '1.18.1', '1.18', '1.17.1', '1.17', '1.16.5', '1.16.4', '1.16.3', '1.16.2', '1.16.1', '1.16', '1.15.2', '1.15.1', '1.15', '1.14.4', '1.14.3', '1.14.2', '1.14.1', '1.14', '1.13.2', '1.13.1', '1.13', '1.12.2', '1.12.1', '1.12', '1.11.2', '1.11.1', '1.11', '1.10.2', '1.10.1', '1.10', '1.9.4', '1.9.3', '1.9.2', '1.9.1', '1.9', '1.8.9', '1.8.8', '1.8.7', '1.8.6', '1.8.5', '1.8.4', '1.8.3', '1.8.2', '1.8.1', '1.8', '1.7.10', '1.7.9', '1.7.8', '1.7.7', '1.7.6', '1.7.5', '1.7.4', '1.7.3', '1.7.2', '1.6.4', '1.6.2', '1.6.1', '1.5.2', '1.5.1', '1.4.7', '1.4.6', '1.4.5', '1.4.4', '1.4.2', '1.3.2', '1.3.1', '1.2.5', '1.2.4', '1.2.3', '1.2.2', '1.2.1', '1.1', '1.0'],
+                        is_preview: true,
+                        preview_limit: 2
+                    },
+                    {
+                        label: 'Loader',
+                        options: ['Fabric', 'Forge', 'NeoForge'],
+                        is_preview: true,
+                        preview_limit: 1
+                    },
+                    {
+                        label: 'Category',
+                        options: ['Adventure', 'Cursed', 'Decoration', 'Economy', 'Equipment', 'Food', 'Game Mechanics', 'Library', 'Magic', 'Management', 'Minigame', 'Mobs', 'Optimization', 'Social', 'Storage', 'Technology', 'Transportation', 'Utility', 'World Generation'],
+                        is_preview: true,
+                        preview_limit: 1
+                    },
+                    {
+                        label: 'Environment',
+                        options: ['Client', 'Server'],
+                        is_preview: false,
+                        preview_limit: 0
+                    }
+                ]
+                : [];
+
+            const uiConfig = isMinecraftMods
+                ? {
+                    viewType: 'grid',
+                    allowed_layouts: ['grid', 'compact', 'list'],
+                    badgeFields: ['loader', 'environment', 'game_versions', 'category', 'mod_version', 'tags'],
+                    badgeMax: 6,
+                    file_schema: [
+                        { key: 'version_number', label: 'Версия', type: 'text', required: true },
+                        { key: 'loader', label: 'Загрузчик', type: 'select', options: ['Fabric', 'Forge', 'NeoForge'] },
+                        { key: 'game_version', label: 'Версия игры', type: 'text' }
+                    ]
+                }
+                : game.slug === 'minecraft' && section.slug === 'skins'
+                    ? {
+                        viewType: 'skin',
+                        allowed_layouts: ['skin', 'grid'],
+                        file_schema: [
+                            { key: 'version_number', label: 'Версия', type: 'text', required: true },
+                            { key: 'resolution', label: 'Разрешение', type: 'text' }
+                        ]
+                    }
+                    : { viewType: 'grid', allowed_layouts: ['grid', 'list'], file_schema: [{ key: 'version_number', label: 'Версия', type: 'text', required: true }] };
+
             const { rows: sectionRows } = await server.pg.query(
-                `INSERT INTO sections (game_id, slug, name) 
-                 VALUES ($1, $2, $3) 
-                 ON CONFLICT (game_id, slug) DO UPDATE SET name = EXCLUDED.name
+                `INSERT INTO sections (game_id, slug, name, ui_config, filter_config) 
+                 VALUES ($1, $2, $3, $4, $5) 
+                 ON CONFLICT (game_id, slug) DO UPDATE SET 
+                    name = EXCLUDED.name, 
+                    ui_config = EXCLUDED.ui_config,
+                    filter_config = EXCLUDED.filter_config
                  RETURNING id`,
-                [gameId, section.slug, section.name]
+                [gameId, section.slug, section.name, JSON.stringify(uiConfig), JSON.stringify(filterConfig)]
             );
             const sectionId = sectionRows[0].id;
 
             // Seed items for Minecraft Mods
             if (game.slug === 'minecraft' && section.slug === 'mods') {
                 const items = [
-                    { title: 'Sodium', slug: 'sodium', summary: 'A modern rendering engine for Minecraft.' },
-                    { title: 'Iris Shaders', slug: 'iris', summary: 'A modern shaders mod for Minecraft.' },
-                    { title: 'Lithium', slug: 'lithium', summary: 'A general-purpose optimization mod.' }
+                    {
+                        title: 'Sodium',
+                        slug: 'sodium',
+                        summary: 'A modern rendering engine for Minecraft.',
+                        attributes: {
+                            loader: 'Fabric',
+                            environment: 'Client & Server',
+                            game_versions: ['1.20.1', '1.20.4'],
+                            category: 'Optimization',
+                            mod_version: '1.0.0',
+                            tags: ['performance', 'client', 'server']
+                        }
+                    },
+                    {
+                        title: 'Iris Shaders',
+                        slug: 'iris',
+                        summary: 'A modern shaders mod for Minecraft.',
+                        attributes: {
+                            loader: 'Fabric',
+                            environment: 'Client',
+                            game_versions: ['1.20.1'],
+                            category: 'Optimization',
+                            mod_version: '1.1.0',
+                            tags: ['shaders', 'graphics']
+                        }
+                    },
+                    {
+                        title: 'Lithium',
+                        slug: 'lithium',
+                        summary: 'A general-purpose optimization mod.',
+                        attributes: {
+                            loader: 'Fabric',
+                            environment: 'Server',
+                            game_versions: ['1.20.1'],
+                            category: 'Optimization',
+                            mod_version: '1.0.5',
+                            tags: ['server', 'performance']
+                        }
+                    }
                 ];
                 for (const item of items) {
                     await server.pg.query(
-                        `INSERT INTO items (section_id, author_id, title, slug, summary, status) 
-                         VALUES ($1, $2, $3, $4, $5, $6) 
-                         ON CONFLICT (section_id, slug) DO NOTHING`,
-                        [sectionId, authorId, item.title, item.slug, item.summary, 'published']
+                        `INSERT INTO items (section_id, author_id, title, slug, summary, attributes, status) 
+                         VALUES ($1, $2, $3, $4, $5, $6, $7) 
+                         ON CONFLICT (section_id, slug) DO UPDATE SET 
+                            attributes = EXCLUDED.attributes,
+                            summary = EXCLUDED.summary`,
+                        [sectionId, authorId, item.title, item.slug, item.summary, JSON.stringify(item.attributes), 'published']
                     );
                 }
             }
