@@ -5,11 +5,17 @@ import SidebarBlock from './SidebarBlock';
 
 interface SidebarCreatorsProps {
   authorName?: string;
+  authorAvatar?: string;
 }
 
-const SidebarCreators: React.FC<SidebarCreatorsProps> = ({ authorName = 'Неизвестен' }) => {
+const SidebarCreators: React.FC<SidebarCreatorsProps> = ({ authorName = 'Неизвестен', authorAvatar }) => {
   const creators = [
-    { name: authorName, role: 'Владелец', avatar: `https://i.pravatar.cc/100?u=${authorName}`, isOwner: true }
+    {
+      name: authorName,
+      role: 'Владелец',
+      avatar: authorAvatar,
+      isOwner: true
+    }
   ];
 
   return (
@@ -22,7 +28,15 @@ const SidebarCreators: React.FC<SidebarCreatorsProps> = ({ authorName = 'Неи�
             className="flex items-center gap-3 group cursor-pointer p-1.5 -m-1.5 rounded-lg hover:bg-white/[0.03] transition-all no-underline"
           >
             <div className="w-9 h-9 rounded-full overflow-hidden bg-zinc-800 transition-all duration-300 group-hover:scale-105 shadow-sm shrink-0 relative">
-              <img src={c.avatar} className="w-full h-full object-cover" alt={c.name} />
+              {c.avatar ? (
+                <img src={c.avatar} className="w-full h-full object-cover" alt={c.name} />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-zinc-600 bg-white/5">
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                  </svg>
+                </div>
+              )}
               {c.isOwner && (
                 <div className="absolute inset-0 border border-blue-500/30 rounded-full"></div>
               )}

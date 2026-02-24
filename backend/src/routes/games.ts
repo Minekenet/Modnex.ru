@@ -5,8 +5,9 @@ export default async function gamesRoutes(server: FastifyInstance) {
     const gameService = new GameService(server.pg);
 
     server.get('/games', async (request, reply) => {
+        const query = request.query as any;
         try {
-            const games = await gameService.findAll();
+            const games = await gameService.findAll(query);
             return games;
         } catch (err) {
             server.log.error(err);

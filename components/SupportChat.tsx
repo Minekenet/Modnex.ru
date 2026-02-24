@@ -85,13 +85,11 @@ const SupportChat: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpe
     <div className="fixed bottom-32 right-8 z-[100] w-[420px] h-[640px] bg-[#1a1b23] rounded-[32px] shadow-[0_40px_100px_rgba(0,0,0,0.8)] border border-white/5 flex flex-col overflow-hidden animate-in slide-in-from-bottom-12 duration-300">
       <div className="p-6 bg-[#24262b] border-b border-white/5 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">
-          <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-black shadow-lg">M</div>
+          <div className="w-10 h-10 bg-zinc-800 rounded-full flex items-center justify-center text-zinc-400 overflow-hidden shadow-lg border-2 border-white/5">
+            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" /></svg>
+          </div>
           <div>
             <h3 className="text-white font-black text-sm uppercase tracking-widest leading-none m-0">Поддержка</h3>
-            <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest flex items-center gap-1.5 mt-1">
-              <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
-              Тикеты в БД
-            </span>
           </div>
         </div>
         <button onClick={onClose} className="text-zinc-600 hover:text-white transition-colors bg-transparent border-none cursor-pointer p-2">

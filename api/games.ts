@@ -2,8 +2,8 @@ import api from './client';
 import { Game } from '../types';
 
 export const gamesService = {
-    async getAll() {
-        const response = await api.get<Game[]>('/games');
+    async getAll(params: { q?: string } = {}) {
+        const response = await api.get<Game[]>('/games', { params });
         return response.data;
     },
 

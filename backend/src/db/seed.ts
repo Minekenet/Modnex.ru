@@ -1,17 +1,37 @@
 import { FastifyInstance } from 'fastify';
+import bcrypt from 'bcryptjs';
 
 export async function seedDatabase(server: FastifyInstance) {
     server.log.info('Seeding database...');
 
-    // 1. Create Test User
+    // 1. Admin user: логин admin@modnex.ru, пароль admin123
+    const adminPasswordHash = await bcrypt.hash('admin123', 10);
     const { rows: userRows } = await server.pg.query(
-        `INSERT INTO users (username, email, password_hash, role, is_verified) 
-         VALUES ($1, $2, $3, $4, $5) 
-         ON CONFLICT (username) DO UPDATE SET username = EXCLUDED.username
+        `INSERT INTO users (username, email, password_hash, role, is_verified, bio, links) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7) 
+         ON CONFLICT (username) DO NOTHING
          RETURNING id`,
-        ['eldeston', 'admin@modnex.ru', 'hashed_pass', 'admin', true]
+        [
+            'eldeston',
+            'admin@modnex.ru',
+            adminPasswordHash,
+            'admin',
+            true,
+            'Разработчик Modnex.ru - главной платформы для модинга.',
+            JSON.stringify([
+                { label: 'GitHub', url: 'https://github.com/modnex' },
+                { label: 'Discord', url: 'https://discord.gg/modnex' }
+            ])
+        ]
     );
-    const authorId = userRows[0].id;
+
+    let authorId;
+    if (userRows.length > 0) {
+        authorId = userRows[0].id;
+    } else {
+        const { rows } = await server.pg.query('SELECT id FROM users WHERE username = $1', ['eldeston']);
+        authorId = rows[0].id;
+    }
 
     const games = [
         {
@@ -158,12 +178,25 @@ export async function seedDatabase(server: FastifyInstance) {
                 ];
                 for (const item of items) {
                     await server.pg.query(
-                        `INSERT INTO items (section_id, author_id, title, slug, summary, attributes, status) 
-                         VALUES ($1, $2, $3, $4, $5, $6, $7) 
+                        `INSERT INTO items (section_id, author_id, title, slug, summary, attributes, status, links) 
+                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
                          ON CONFLICT (section_id, slug) DO UPDATE SET 
                             attributes = EXCLUDED.attributes,
-                            summary = EXCLUDED.summary`,
-                        [sectionId, authorId, item.title, item.slug, item.summary, JSON.stringify(item.attributes), 'published']
+                            summary = EXCLUDED.summary,
+                            links = EXCLUDED.links`,
+                        [
+                            sectionId,
+                            authorId,
+                            item.title,
+                            item.slug,
+                            item.summary,
+                            JSON.stringify(item.attributes),
+                            'published',
+                            JSON.stringify([
+                                { label: 'Official Wiki', url: 'https://minecraft.fandom.com/wiki/Minecraft_Wiki' },
+                                { label: 'Discord', url: 'https://discord.gg/modnex' }
+                            ])
+                        ]
                     );
                 }
             }

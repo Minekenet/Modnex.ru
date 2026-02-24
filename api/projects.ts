@@ -38,5 +38,24 @@ export const projectsService = {
     async updateStatus(gameSlug: string, sectionSlug: string, projectSlug: string, status: 'draft' | 'published' | 'hidden') {
         const response = await api.patch(`/games/${gameSlug}/${sectionSlug}/${projectSlug}/status`, { status });
         return response.data;
+    },
+
+    async checkLike(itemId: string) {
+        try {
+            const response = await api.get(`/items/${itemId}/like`);
+            return response.data.is_liked;
+        } catch {
+            return false;
+        }
+    },
+
+    async toggleLike(itemId: string, currentlyLiked: boolean) {
+        if (currentlyLiked) {
+            await api.delete(`/items/${itemId}/like`);
+            return false;
+        } else {
+            await api.post(`/items/${itemId}/like`);
+            return true;
+        }
     }
 };

@@ -23,7 +23,8 @@ import fastifyMultipart from '@fastify/multipart';
 dotenv.config();
 
 const server: FastifyInstance = Fastify({
-    logger: true
+    logger: true,
+    bodyLimit: 100 * 1024 * 1024 // 100MB
 });
 
 server.register(helmet);

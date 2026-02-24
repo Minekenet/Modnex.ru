@@ -3,8 +3,9 @@ import { FileService } from '../services/files';
 import { ItemService } from '../services/items';
 
 export default async function filesRoutes(server: FastifyInstance) {
+    const publicUrlBase = `${process.env.S3_PUBLIC_ENDPOINT || 'http://localhost:9000'}/${process.env.S3_BUCKET || 'modnex-files'}`;
     const fileService = new FileService(server.pg, server.storage);
-    const itemService = new ItemService(server.pg);
+    const itemService = new ItemService(server.pg, publicUrlBase);
 
     // Upload Version (Auth Required)
     // POST /items/:itemId/files

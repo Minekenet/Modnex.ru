@@ -153,38 +153,42 @@ const FilesTab: React.FC<FilesTabProps> = ({
         )}
       </div>
 
-      <div className="bg-[#0d0d0f] rounded-2xl overflow-hidden shadow-2xl mt-8">
-        <div className="grid grid-cols-[minmax(180px,1fr)_130px_90px_100px_120px_100px_40px] gap-2 px-8 py-6 bg-[#080809] text-[13px] font-black uppercase tracking-widest text-zinc-500">
-          <span>Название</span><span>Загружен</span><span>Размер</span><span>Версия</span><span>Доп.</span><span>Загрузки</span><span></span>
+      <div className="bg-[#0d0d0f] rounded-2xl shadow-2xl mt-8 overflow-x-auto">
+        <div className="min-w-[1000px]">
+          <div className="grid grid-cols-[1fr_130px_100px_110px_110px_100px_60px] gap-4 px-8 py-6 bg-[#080809] text-[12px] font-black uppercase tracking-widest text-zinc-500">
+            <span>Название</span><span>Загружен</span><span>Размер</span><span>Версия</span><span>Доп.</span><span>Загрузки</span><span></span>
+          </div>
+          <div className="divide-y divide-white/[0.02]">
+            {currentFiles.map((file) => (
+              <div key={file.id} className="grid grid-cols-[1fr_130px_100px_110px_110px_100px_60px] gap-4 px-8 py-5 items-center hover:bg-white/[0.02] transition-colors group">
+                <span className="text-[14px] font-bold text-zinc-200 group-hover:text-white transition-colors truncate block">{file.fileName}</span>
+                <div className="text-[13px] font-medium text-zinc-500 whitespace-nowrap">{file.date}</div>
+                <div className="text-[13px] font-medium text-zinc-500">{file.size}</div>
+                <div className="text-[13px] font-bold text-zinc-400">{file.gameVer}</div>
+                <div className="text-[13px] font-bold text-zinc-400">{file.loader}</div>
+                <div className="text-[13px] font-bold text-zinc-400">{file.downloads}</div>
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => handleDownload(file.id)}
+                    disabled={loadingFileId === String(file.id)}
+                    className="w-10 h-10 bg-blue-600/10 text-blue-500 hover:bg-blue-600 hover:text-white border-none cursor-pointer transition-all flex items-center justify-center rounded-xl outline-none active:scale-90 disabled:opacity-50"
+                  >
+                    {loadingFileId === String(file.id) ? (
+                      <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+            ))}
+            {currentFiles.length === 0 && <div className="py-32 text-center text-zinc-800 font-black uppercase tracking-[0.4em]">Ничего не найдено</div>}
+          </div>
         </div>
-        <div className="divide-y divide-white/[0.02]">
-          {currentFiles.map((file) => (
-            <div key={file.id} className="grid grid-cols-[minmax(180px,1fr)_130px_90px_100px_120px_100px_40px] gap-2 px-8 py-5 items-center hover:bg-white/[0.02] transition-colors group">
-              <span className="text-[14px] font-bold text-zinc-300 group-hover:text-white transition-colors truncate block">{file.fileName}</span>
-              <div className="text-[13px] font-medium text-zinc-500 whitespace-nowrap">{file.date}</div>
-              <div className="text-[13px] font-medium text-zinc-500">{file.size}</div>
-              <div className="text-[13px] font-bold text-zinc-400">{file.gameVer}</div>
-              <div className="text-[13px] font-bold text-zinc-400">{file.loader}</div>
-              <div className="text-[13px] font-bold text-zinc-400">{file.downloads}</div>
-              <button
-                onClick={() => handleDownload(file.id)}
-                disabled={loadingFileId === String(file.id)}
-                className={`bg-blue-600/10 text-blue-500 hover:bg-blue-600 hover:text-white border-none cursor-pointer transition-all p-2.5 flex items-center justify-center rounded-lg outline-none active:scale-95 disabled:opacity-50`}
-              >
-                {loadingFileId === String(file.id) ? (
-                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
-                ) : (
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
-                  </svg>
-                )}
-              </button>
-            </div>
-          ))}
-          {currentFiles.length === 0 && <div className="py-32 text-center text-zinc-800 font-black uppercase tracking-[0.4em]">Ничего не найдено</div>}
-        </div>
+        {renderPagination()}
       </div>
-      {renderPagination()}
     </div>
   );
 };

@@ -2,9 +2,11 @@ import { FastifyInstance } from 'fastify';
 
 export class ItemService {
     private db: FastifyInstance['pg'];
+    private publicUrlBase: string;
 
-    constructor(db: FastifyInstance['pg']) {
+    constructor(db: FastifyInstance['pg'], publicUrlBase: string = 'http://localhost:9000/modnex-files') {
         this.db = db;
+        this.publicUrlBase = publicUrlBase;
     }
 
     async create(data: { section_id: string; author_id: string; title: string; slug: string; summary: string; description: string; attributes: any; links?: any[]; status?: string }) {
@@ -63,14 +65,16 @@ export class ItemService {
 
     async findBySlug(gameSlug: string, sectionSlug: string, itemSlug: string) {
         const query = `
-      SELECT i.*, u.username as author_name, s.slug as section_slug, g.slug as game_slug
+      SELECT i.*, u.username as author_name, u.avatar_url as author_avatar, s.slug as section_slug, g.slug as game_slug,
+             (SELECT jsonb_agg($4 || '/' || url) FROM item_gallery WHERE item_id = i.id) as gallery,
+             (SELECT $4 || '/' || url FROM item_gallery WHERE item_id = i.id AND is_primary = true LIMIT 1) as banner_url
       FROM items i
       JOIN sections s ON i.section_id = s.id
       JOIN games g ON s.game_id = g.id
       LEFT JOIN users u ON i.author_id = u.id
       WHERE g.slug = $1 AND s.slug = $2 AND i.slug = $3
     `;
-        const { rows } = await this.db.query(query, [gameSlug, sectionSlug, itemSlug]);
+        const { rows } = await this.db.query(query, [gameSlug, sectionSlug, itemSlug, this.publicUrlBase]);
         return rows[0];
     }
 
@@ -79,8 +83,8 @@ export class ItemService {
 
         let query = `
       SELECT i.id, i.title, i.slug, i.summary, i.attributes, i.stats, i.created_at, 
-             u.username as author_name,
-             (SELECT url FROM item_gallery WHERE item_id = i.id AND is_primary = true LIMIT 1) as cover_url
+             u.username as author_name, u.avatar_url as author_avatar,
+             (SELECT $3 || '/' || url FROM item_gallery WHERE item_id = i.id AND is_primary = true LIMIT 1) as cover_url
       FROM items i
       JOIN sections s ON i.section_id = s.id
       JOIN games g ON s.game_id = g.id
@@ -88,8 +92,8 @@ export class ItemService {
       WHERE g.slug = $1 AND s.slug = $2 AND i.status = 'published'
     `;
 
-        const params: any[] = [gameSlug, sectionSlug];
-        let paramIndex = 3;
+        const params: any[] = [gameSlug, sectionSlug, this.publicUrlBase];
+        let paramIndex = 4; // Changed from 3 to 4 because this.publicUrlBase is now the 3rd parameter ($3)
 
         // Dynamic JSONB filtering
         // Example: ?loader=fabric -> attributes->>'loader' = 'fabric'
@@ -119,7 +123,7 @@ export class ItemService {
         const offset = (page - 1) * limit;
         const query = `
             SELECT i.id, i.title, i.slug, i.summary, i.attributes, i.stats, i.created_at, 
-                   u.username as author_name,
+                   u.username as author_name, u.avatar_url as author_avatar,
                    s.slug as section_slug, g.slug as game_slug,
                    (SELECT url FROM item_gallery WHERE item_id = i.id AND is_primary = true LIMIT 1) as cover_url
             FROM items i

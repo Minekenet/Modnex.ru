@@ -144,7 +144,7 @@ const extractCardMeta = (mod: any) => {
     const image =
         mod.cover_url ||
         mod.banner_url ||
-        (mod.gallery && mod.gallery[0]) ||
+        (mod.gallery && mod.gallery.length > 0 ? mod.gallery[0] : null) ||
         `https://picsum.photos/seed/${mod.id || mod.slug}/600/350`;
     const description = mod.summary || mod.description || mod.desc || '';
     const fileSize = mod.attributes?.fileSize || mod.attributes?.size || '';
@@ -269,175 +269,87 @@ export const GridCard: React.FC<CardProps> = ({ mod, gameSlug, badgeFields, badg
     );
 };
 
-export const CompactCard: React.FC<CardProps> = ({ mod, gameSlug, badgeFields, badgeMax, previewFilterConfig, onClick }) => {
-    const { image, category, downloads, likes, views } = extractCardMeta(mod);
-    const usePreview = previewFilterConfig?.some(f => f.is_preview);
-    const previewResult = usePreview ? getPreviewBadges(mod, previewFilterConfig) : null;
-    const badges = usePreview && previewResult ? previewResult.badges : normalizeBadges(mod, badgeFields, badgeMax ?? 6, previewFilterConfig);
-    const moreCount = previewResult?.moreCount ?? 0;
+/** Минималистичная компактная карточка: только обложка, название/краткое описание, ровно 1 тег (Категория). */
+export const CompactCard: React.FC<CardProps> = ({ mod, gameSlug, onClick }) => {
+    const { image, category, description, likes, downloads } = extractCardMeta(mod);
 
     return (
         <div
-            className="bg-[#27292e] rounded-2xl overflow-hidden flex items-center gap-4 p-3 border border-white/5 group cursor-pointer transition-all hover:border-white/10 hover:shadow-lg hover:shadow-black/20"
+            className="bg-[#24262b] rounded-2xl overflow-hidden flex flex-col p-0 group cursor-pointer transition-all"
             onClick={onClick}
         >
-            <div className="w-24 h-24 rounded-xl overflow-hidden bg-[#1c1c1f] shrink-0 flex-shrink-0">
-                <img src={image} className="w-full h-full object-cover" alt={mod.title} />
-            </div>
-            <div className="flex-1 min-w-0 flex flex-col gap-2">
-                <h3 className="font-bold text-[14px] text-white leading-tight line-clamp-1 group-hover:text-white">
-                    {mod.title}
-                </h3>
-                <div className="flex items-center gap-2 text-[11px] text-zinc-400">
-                    <span className="truncate">{mod.author_name || 'Unknown'}</span>
-                    {category && (
-                        <>
-                            <span className="w-1 h-1 rounded-full bg-zinc-500" />
-                            <span className="px-2 py-0.5 bg-white/10 text-[10px] rounded-lg font-semibold text-zinc-200 truncate">
-                                {category}
-                            </span>
-                        </>
-                    )}
-                </div>
-                {(badges.length > 0 || moreCount > 0) && (
-                    <div className="flex flex-wrap gap-1.5 items-center">
-                        {badges.slice(0, 4).map((b) => (
-                            <span
-                                key={b}
-                                className="px-2 py-0.5 bg-white/5 text-[10px] rounded-lg font-medium text-zinc-300 truncate"
-                                title={b}
-                            >
-                                {b}
-                            </span>
-                        ))}
-                        {moreCount > 0 && (
-                            <span className="px-2 py-0.5 bg-white/10 text-[10px] rounded-lg font-medium text-zinc-400">+ ещё {moreCount}</span>
-                        )}
+            <div className="aspect-video w-full overflow-hidden bg-[#101114] relative">
+                <img
+                    src={image}
+                    className="w-full h-full object-cover transition-transform duration-500"
+                    alt={mod.title}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-3">
+                    <div className="flex items-center gap-3 text-[10px] font-black text-white/90 uppercase tracking-widest">
+                        <span className="flex items-center gap-1"><IconThumbUp className="w-3 h-3" /> {likes}</span>
+                        <span className="flex items-center gap-1"><IconDownload className="w-3 h-3" /> {downloads}</span>
                     </div>
-                )}
-                <div className="flex items-center gap-4 text-[11px] text-zinc-500">
-                    <span className="inline-flex items-center gap-1">
-                        <IconDownload className="w-3.5 h-3.5" />
-                        {(downloads || 0).toLocaleString()}
-                    </span>
-                    <span className="inline-flex items-center gap-1">
-                        <IconThumbUp className="w-3.5 h-3.5" />
-                        {(likes || 0).toLocaleString()}
-                    </span>
-                    <span className="inline-flex items-center gap-1">
-                        <IconVisibility className="w-3.5 h-3.5" />
-                        {(views || 0).toLocaleString()}
-                    </span>
                 </div>
             </div>
-            <div className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                <IconMoreHoriz className="w-5 h-5 text-zinc-400" />
+            <div className="p-4 flex flex-col gap-1">
+                <div className="flex items-start justify-between gap-2">
+                    <h3 className="font-black text-[13px] text-white leading-tight line-clamp-1 uppercase tracking-tight transition-colors">
+                        {mod.title}
+                    </h3>
+                </div>
+                {category && (
+                    <span className="px-2 py-0.5 bg-zinc-800/50 rounded text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em] w-fit">
+                        {category}
+                    </span>
+                )}
             </div>
         </div>
     );
 };
 
-export const ListCard: React.FC<CardProps> = ({ mod, gameSlug, badgeFields, badgeMax, previewFilterConfig, onClick }) => {
-    const { image, category, description, downloads, likes, views, relativeTime, fullDate, fileSize } = extractCardMeta(mod);
-    const usePreview = previewFilterConfig?.some(f => f.is_preview);
-    const previewResult = usePreview ? getPreviewBadges(mod, previewFilterConfig) : null;
-    const badges = usePreview && previewResult ? previewResult.badges : normalizeBadges(mod, badgeFields, badgeMax ?? 6, previewFilterConfig);
-    const moreCount = previewResult?.moreCount ?? 0;
+/** Минималистичная карточка списка: обложка, название/краткое описание, ровно 1 тег (Категория). */
+export const ListCard: React.FC<CardProps> = ({ mod, gameSlug, onClick }) => {
+    const { image, category, description, likes, downloads, views, relativeTime } = extractCardMeta(mod);
 
     return (
         <div
-            className="bg-[#27292e] rounded-2xl overflow-hidden flex items-stretch gap-6 p-4 border border-white/5 group cursor-pointer transition-all hover:border-white/10 hover:shadow-lg"
+            className="bg-[#24262b] rounded-2xl overflow-hidden flex items-center gap-6 p-4 cursor-pointer transition-all"
             onClick={onClick}
         >
-            <div className="w-48 h-28 rounded-xl overflow-hidden bg-[#1c1c1f] shrink-0">
+            <div className="w-40 h-24 rounded-xl overflow-hidden bg-[#101114] shrink-0 relative">
                 <img
                     src={image}
                     className="w-full h-full object-cover"
                     alt={mod.title}
                 />
             </div>
-
-            <div className="flex-1 flex flex-col min-w-0 justify-center">
-                <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0 flex-1">
-                        <h3 className="font-bold text-[16px] text-white leading-tight line-clamp-1">
-                            {mod.title}
-                        </h3>
-                        <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[12px] text-zinc-400">
-                            <span>by {mod.author_name || 'Unknown'}</span>
-                            {category && (
-                                <span className="px-2 py-0.5 bg-white/10 rounded-lg text-[11px] font-semibold text-zinc-200">
-                                    {category}
-                                </span>
-                            )}
-                        </div>
-                        {(badges.length > 0 || moreCount > 0) && (
-                            <div className="mt-2 flex flex-wrap gap-1.5 items-center">
-                                {badges.map((b) => (
-                                    <span
-                                        key={b}
-                                        className="px-2 py-0.5 bg-white/5 text-[10px] rounded-lg font-medium text-zinc-300 truncate"
-                                        title={b}
-                                    >
-                                        {b}
-                                    </span>
-                                ))}
-                                {moreCount > 0 && (
-                                    <span className="px-2 py-0.5 bg-white/10 text-[10px] rounded-lg font-medium text-zinc-400">+ ещё {moreCount}</span>
-                                )}
-                            </div>
-                        )}
-                        {description && (
-                            <p className="mt-2 text-[13px] text-zinc-400 leading-snug line-clamp-2">
-                                {description}
-                            </p>
-                        )}
-                    </div>
-
-                    <button
-                        className="mt-1 text-zinc-500 hover:text-zinc-300 bg-transparent border-none cursor-pointer p-1 rounded-full"
-                        aria-label="More actions"
-                    >
-                        <IconMoreHoriz className="w-6 h-6" />
-                    </button>
+            <div className="flex-1 min-w-0 py-1">
+                <div className="flex items-center gap-3 mb-1">
+                    <h3 className="font-black text-[16px] text-white leading-tight line-clamp-1 uppercase tracking-tight transition-colors">
+                        {mod.title}
+                    </h3>
+                    {category && (
+                        <span className="px-2 py-1 bg-zinc-800 rounded text-[9px] font-black text-zinc-400 uppercase tracking-widest">
+                            {category}
+                        </span>
+                    )}
                 </div>
-
-                <div className="mt-auto pt-3 flex flex-wrap items-center justify-between gap-3 text-[12px] text-zinc-500">
-                    <div className="flex flex-wrap items-center gap-4">
-                        {relativeTime && (
-                            <span className="inline-flex items-center gap-1.5">
-                                <IconSchedule className="w-4 h-4 text-zinc-500" />
-                                {relativeTime}
-                            </span>
-                        )}
-                        {fullDate && (
-                            <span className="inline-flex items-center gap-1.5">
-                                <IconCalendar className="w-4 h-4 text-zinc-500" />
-                                {fullDate}
-                            </span>
-                        )}
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-4 text-[12px] text-zinc-400">
-                        <span className="inline-flex items-center gap-1.5">
-                            <IconThumbUp className="w-5 h-5 text-zinc-300" />
-                            {(likes || 0).toLocaleString()}
-                        </span>
-                        <span className="inline-flex items-center gap-1.5">
-                            <IconDownload className="w-5 h-5 text-zinc-300" />
-                            {(downloads || 0).toLocaleString()}
-                        </span>
-                        <span className="inline-flex items-center gap-1.5">
-                            <IconVisibility className="w-5 h-5 text-zinc-300" />
-                            {(views || 0).toLocaleString()}
-                        </span>
-                        {fileSize && (
-                            <span className="inline-flex items-center gap-1.5 text-zinc-200">
-                                <IconDescription className="w-5 h-5 text-zinc-200" />
-                                {fileSize}
-                            </span>
-                        )}
-                    </div>
+                {description && (
+                    <p className="text-[12px] text-zinc-400 line-clamp-1 font-medium mb-3 opacity-70">{description}</p>
+                )}
+                <div className="flex items-center gap-6 text-[10px] font-black text-zinc-500 uppercase tracking-widest">
+                    <span className="flex items-center gap-1.5 transition-colors">
+                        <IconThumbUp className="w-3.5 h-3.5" /> {likes.toLocaleString()}
+                    </span>
+                    <span className="flex items-center gap-1.5 transition-colors">
+                        <IconDownload className="w-3.5 h-3.5" /> {downloads.toLocaleString()}
+                    </span>
+                    <span className="flex items-center gap-1.5 transition-colors">
+                        <IconVisibility className="w-3.5 h-3.5" /> {views.toLocaleString()}
+                    </span>
+                    <span className="ml-auto text-zinc-600 transition-colors">
+                        {relativeTime}
+                    </span>
                 </div>
             </div>
         </div>

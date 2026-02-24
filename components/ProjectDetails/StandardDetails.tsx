@@ -52,32 +52,32 @@ export const StandardDetails: React.FC<StandardDetailsProps> = ({
 
                 <div className="animate-in fade-in duration-500">
                     {activeTab === 'Описание' && (
-                        <div className="bg-[#24262b] p-10 md:p-14 rounded-3xl space-y-12 shadow-xl leading-relaxed text-zinc-300 overflow-hidden">
+                        <div className="space-y-12 leading-relaxed text-zinc-300">
                             <div className="space-y-6">
-                                <h2 className="text-3xl font-black text-white uppercase tracking-tight">Обзор модификации</h2>
-                                <p className="text-lg text-zinc-400">
-                                    Этот проект полностью переосмысляет стандартные механики. Мы создали этот инструмент для тех, кто хочет получить максимум от игры без ущерба для производительности.
-                                </p>
+                                <h2 className="text-3xl font-black text-white uppercase tracking-tight">Обзор проекта</h2>
+                                <div className="text-lg text-zinc-400 whitespace-pre-wrap">
+                                    {modData.description || 'Описание отсутствует.'}
+                                </div>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-                                <div className="space-y-6">
-                                    <h3 className="text-xl font-black text-white uppercase tracking-tight">Ключевые особенности</h3>
-                                    <ul className="space-y-4 p-0 m-0 list-none">
-                                        {['Улучшенная оптимизация кода', 'Поддержка сторонних шейдеров', 'Динамическое освещение объектов', 'Исправление багов'].map(item => (
-                                            <li key={item} className="flex items-start gap-4 text-[15px] font-semibold text-zinc-400 group">
-                                                <div className="w-6 h-6 rounded-full bg-blue-600/20 flex items-center justify-center shrink-0 group-hover:bg-blue-600 transition-colors">
-                                                    <svg className="w-3 h-3 text-blue-400 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7" /></svg>
-                                                </div>
-                                                {item}
-                                            </li>
-                                        ))}
-                                    </ul>
+                            {/* Optional: Add decorative sections only if description is short or as extra details */}
+                            {(!modData.description || modData.description.length < 100) && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center opacity-50">
+                                    <div className="space-y-6">
+                                        <h3 className="text-xl font-black text-white uppercase tracking-tight">Возможности</h3>
+                                        <ul className="space-y-4 p-0 m-0 list-none">
+                                            {['Оптимизация', 'Поддержка дополнений', 'Исправление ошибок'].map(item => (
+                                                <li key={item} className="flex items-start gap-4 text-[15px] font-semibold text-zinc-400">
+                                                    <div className="w-6 h-6 rounded-full bg-blue-600/20 flex items-center justify-center shrink-0">
+                                                        <svg className="w-3 h-3 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7" /></svg>
+                                                    </div>
+                                                    {item}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
                                 </div>
-                                <div className="rounded-3xl overflow-hidden bg-black/40 aspect-[4/3] shadow-2xl relative">
-                                    <img src={`https://picsum.photos/seed/${modId}-desc-img/600/600`} className="w-full h-full object-cover" alt="" />
-                                </div>
-                            </div>
+                            )}
                         </div>
                     )}
 
@@ -117,8 +117,8 @@ export const StandardDetails: React.FC<StandardDetailsProps> = ({
                     createdAt={modData.created_at}
                     updatedAt={modData.updated_at}
                 />
-                <SidebarCreators authorName={modData.author_name} />
-                <SidebarLinks />
+                <SidebarCreators authorName={modData.author_name} authorAvatar={modData.author_avatar} />
+                {modData.links && modData.links.length > 0 && <SidebarLinks links={modData.links} />}
             </div>
         </div>
     );

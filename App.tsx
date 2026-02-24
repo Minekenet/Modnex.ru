@@ -14,6 +14,7 @@ import KnowledgeBasePage from './pages/KnowledgeBasePage';
 import CreateProjectPage from './pages/CreateProjectPage';
 import SupportChat from './components/SupportChat';
 import AdminPage from './pages/AdminPage';
+import SettingsPage from './pages/SettingsPage';
 
 import { usersService } from './api/users';
 
@@ -157,6 +158,7 @@ const App: React.FC = () => {
 
           <ReactRouterDOM.Route path="/faq" element={<KnowledgeBasePage />} />
           <ReactRouterDOM.Route path="/create-project" element={<CreateProjectPage />} />
+          <ReactRouterDOM.Route path="/settings" element={<SettingsPage />} />
           <ReactRouterDOM.Route path="/admin" element={<AdminPage />} />
 
           <ReactRouterDOM.Route path="*" element={<ReactRouterDOM.Navigate to="/" replace />} />

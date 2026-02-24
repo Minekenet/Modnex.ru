@@ -3,6 +3,14 @@ import * as ReactRouterDOM from 'react-router-dom';
 import { usersService } from '../api/users';
 import { formatRussianDate } from '../utils/formatters';
 import Skeleton from '../components/UI/Skeleton';
+import ProfileHeader from '../components/Profile/ProfileHeader';
+import ProfileStats from '../components/Profile/ProfileStats';
+import ProfileTabs from '../components/Profile/ProfileTabs';
+import ProjectFilters from '../components/Profile/ProjectFilters';
+import ProjectList from '../components/Profile/ProjectList';
+import ProfileSidebar from '../components/Profile/ProfileSidebar';
+import ImageCropper from '../components/Profile/ImageCropper';
+import ProfileSettingsModal from '../components/Profile/ProfileSettingsModal';
 
 const ProfilePage: React.FC = () => {
   // ... typical state ...
@@ -13,7 +21,13 @@ const ProfilePage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('Мои проекты');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterGame, setFilterGame] = useState('Все игры');
+  const [filterGame, setFilterGame] = useState<string>('');
+  const [filterCategory, setFilterCategory] = useState<string>('');
+  const [editingBio, setEditingBio] = useState(false);
+  const [localBio, setLocalBio] = useState('');
+  const [showAddLinkForm, setShowAddLinkForm] = useState(false);
+  const [newLinkUrl, setNewLinkUrl] = useState('');
+  const [newLinkLabel, setNewLinkLabel] = useState('');
 
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
@@ -62,7 +76,17 @@ const ProfilePage: React.FC = () => {
 
         const profile = await usersService.getProfile(usernameToFetch!);
         setProfileData(profile);
-        setIsOwnProfile(localUser.username === profile.username);
+        const isOwn = localUser.username === profile.username;
+        setIsOwnProfile(isOwn);
+
+        // Sync local storage and global state if it's our own profile
+        if (isOwn) {
+          const updatedUser = { ...localUser, ...profile };
+          localStorage.setItem('user', JSON.stringify(updatedUser));
+          // Note: we don't need to dispatch 'auth_state_changed' here necessarily 
+          // because we are already on the profile page, but it helps Header etc.
+          window.dispatchEvent(new Event('auth_state_changed'));
+        }
 
         const items = await usersService.getUserItems(usernameToFetch!);
         setMyMods(items.map((i: any) => ({
@@ -84,6 +108,16 @@ const ProfilePage: React.FC = () => {
     fetchProfile();
   }, [paramUsername]);
 
+  useEffect(() => {
+    if (profileData?.bio) {
+      setLocalBio(profileData.bio);
+    }
+  }, [profileData]);
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [paramUsername]);
+
   const handleApplySettings = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -91,9 +125,14 @@ const ProfilePage: React.FC = () => {
         display_name: profileData.display_name,
         bio: profileData.bio,
         avatar_url: profileData.avatar_url,
-        banner_url: profileData.banner_url
+        banner_url: profileData.banner_url,
+        links: profileData.links
       });
       setProfileData(updated);
+
+      // If display name or other profile data was updated, we stay.
+      // But if there's a separate mechanism for username (PATCH), we need to handle it.
+
       setIsSettingsOpen(false);
       alert('Профиль обновлен!');
     } catch (err) {
@@ -102,14 +141,73 @@ const ProfilePage: React.FC = () => {
     }
   };
 
+  const handleSaveBio = async () => {
+    try {
+      const updated = await usersService.updateProfile({ bio: localBio });
+      setProfileData(updated);
+      setEditingBio(false);
+    } catch (err) {
+      console.error(err);
+      alert('Ошибка при сохранении');
+    }
+  };
+
+  const isValidUrl = (s: string) => {
+    try {
+      const u = new URL(s);
+      return u.protocol === 'http:' || u.protocol === 'https:';
+    } catch { return false; }
+  };
+
+  const handleSaveLinks = async (links: { label: string; url: string }[]) => {
+    if (links.some(l => !isValidUrl(l.url))) {
+      alert('Все ссылки должны быть валидными URL (http/https).');
+      return;
+    }
+    try {
+      const updated = await usersService.updateProfile({ links });
+      setProfileData(updated);
+      setNewLinkUrl('');
+      setNewLinkLabel('');
+      setShowAddLinkForm(false);
+    } catch (err) {
+      console.error(err);
+      alert('Ошибка при сохранении ссылок');
+    }
+  };
+
+  const handleAddLink = () => {
+    const current = profileData?.links || [];
+    if (current.length >= 5) return;
+    if (!newLinkUrl.trim()) return;
+    if (!isValidUrl(newLinkUrl.trim())) {
+      alert('Введите корректный URL (например https://...).');
+      return;
+    }
+    const label = newLinkLabel.trim() || (() => { try { return new URL(newLinkUrl.trim()).hostname; } catch { return 'Ссылка'; } })();
+    handleSaveLinks([...current, { label, url: newLinkUrl.trim() }]);
+  };
+
+  const handleRemoveLink = async (index: number) => {
+    const next = (profileData?.links || []).filter((_: any, i: number) => i !== index);
+    await handleSaveLinks(next);
+  };
+
+  const uniqueGames = useMemo(() => [...new Set(myMods.map((i: any) => i.game_slug).filter(Boolean))], [myMods]);
+  const uniqueCategories = useMemo(() => {
+    const list = !filterGame ? myMods : myMods.filter((i: any) => i.game_slug === filterGame);
+    return [...new Set(list.map((i: any) => i.section_slug).filter(Boolean))];
+  }, [myMods, filterGame]);
+
   const filteredList = useMemo(() => {
     const list = activeTab === 'Мои проекты' ? myMods : [];
-    return list.filter(item => {
+    return list.filter((item: any) => {
       const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesGame = filterGame === 'Все игры' || item.game === filterGame;
-      return matchesSearch && matchesGame;
+      const matchesGame = !filterGame || item.game_slug === filterGame;
+      const matchesCategory = !filterCategory || item.section_slug === filterCategory;
+      return matchesSearch && matchesGame && matchesCategory;
     });
-  }, [activeTab, searchQuery, filterGame, myMods]);
+  }, [activeTab, searchQuery, filterGame, filterCategory, myMods]);
 
   const totalPages = Math.ceil(filteredList.length / itemsPerPage) || 1;
   const paginatedList = useMemo(() => {
@@ -173,10 +271,21 @@ const ProfilePage: React.FC = () => {
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(img, cropX, cropY, cropWidth, cropHeight, 0, 0, canvas.width, canvas.height);
 
-    const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.98);
-    if (cropType === 'avatar') setProfileData({ ...profileData, avatarUrl: croppedDataUrl });
-    else setProfileData({ ...profileData, bannerUrl: croppedDataUrl });
-    setIsCropOpen(false);
+    canvas.toBlob(async (blob) => {
+      if (!blob) return;
+      try {
+        const { url } = await usersService.uploadImage(cropType, blob, `${cropType}.jpg`);
+        setProfileData((prev: any) => ({
+          ...prev,
+          [cropType === 'avatar' ? 'avatar_url' : 'banner_url']: url
+        }));
+      } catch (err) {
+        console.error('Failed to upload image:', err);
+        alert('Ошибка при загрузке изображения');
+      } finally {
+        setIsCropOpen(false);
+      }
+    }, 'image/jpeg', 0.98);
   };
 
   const handleMouseDown = (e: React.MouseEvent, type: typeof dragType) => {
@@ -260,17 +369,6 @@ const ProfilePage: React.FC = () => {
     };
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
-  const Pagination = () => {
-    if (totalPages <= 1) return null;
-    const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
-    return (
-      <div className="mt-12 py-8 flex items-center justify-center gap-6 border-t border-white/5">
-        <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => Math.max(1, p - 1))} className="text-zinc-600 hover:text-white transition-colors bg-transparent border-none cursor-pointer disabled:opacity-20"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15 19l-7-7 7-7" /></svg></button>
-        <div className="flex items-center gap-5">{pages.map(n => (<button key={n} onClick={() => setCurrentPage(n)} className={`text-[15px] font-black border-none bg-transparent cursor-pointer transition-all ${currentPage === n ? 'text-white underline underline-offset-8' : 'text-zinc-600 hover:text-white'}`}>{n}</button>))}</div>
-        <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} className="text-zinc-600 hover:text-white transition-colors bg-transparent border-none cursor-pointer disabled:opacity-20"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M9 5l7 7-7 7" /></svg></button>
-      </div>
-    );
-  };
   if (error && !profileData) {
     return (
       <div className="min-h-screen bg-[#1c1c1f] flex flex-col items-center justify-center gap-6">
@@ -283,298 +381,99 @@ const ProfilePage: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#1c1c1f] text-white font-['Inter',_sans-serif] pb-20 relative">
       <div className="max-w-[1300px] mx-auto px-6 pt-10">
-        <div className="bg-[#24262b] rounded-2xl overflow-hidden shadow-2xl mb-12 relative">
-          <div onClick={() => isOwnProfile && bannerInputRef.current?.click()} className={`h-80 relative overflow-hidden bg-[#16161a] ${isOwnProfile ? 'cursor-pointer group' : ''}`}>
-            <input type="file" ref={bannerInputRef} className="hidden" accept="image/*" onChange={(e) => handleFileSelect(e, 'banner')} />
-            {profileData?.banner_url ? (
-              <img src={profileData.banner_url} className="w-full h-full object-cover" alt="" />
-            ) : loading ? (
-              <Skeleton className="w-full h-full opacity-30" />
-            ) : (
-              <div className="absolute inset-0 bg-[#0a0a0c]"></div>
-            )}
-            {isOwnProfile && profileData && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
-                <span className="bg-white/10 px-6 py-3 rounded-xl border border-white/10 text-[11px] font-black uppercase tracking-widest">Изменить баннер</span>
-              </div>
-            )}
-          </div>
-          <div className="px-12 pb-12 pt-24 relative">
-            <div className="flex flex-col md:flex-row items-end gap-10 -mt-36 mb-12">
-              <div className="relative group shrink-0">
-                <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={(e) => handleFileSelect(e, 'avatar')} />
-                <div onClick={() => isOwnProfile && fileInputRef.current?.click()} className={`w-48 h-48 rounded-full border-[10px] border-[#24262b] overflow-hidden bg-[#1a1b23] shadow-2xl transition-all ${isOwnProfile ? 'cursor-pointer hover:brightness-110' : ''}`}>
-                  {profileData?.avatar_url ? (
-                    <img src={profileData.avatar_url} className="w-full h-full object-cover" alt="" />
-                  ) : loading ? (
-                    <Skeleton className="w-full h-full" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-zinc-800">
-                      <svg className="w-24 h-24" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" /></svg>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="flex-grow pb-4">
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-5">
-                      {profileData ? (
-                        <h1 className="text-3xl font-black tracking-tight uppercase leading-none text-white m-0">{profileData.display_name || profileData.username}</h1>
-                      ) : (
-                        <Skeleton className="w-64 h-8" />
-                      )}
-                      <span className="bg-white/5 text-zinc-600 text-[10px] font-black px-3 py-1.5 rounded border border-white/5 tracking-[0.2em] self-center">АВТОР</span>
-                    </div>
-                    {profileData?.bio ? (
-                      <p className="text-zinc-500 text-[15px] font-medium max-w-xl leading-relaxed">{profileData.bio}</p>
-                    ) : loading ? (
-                      <Skeleton className="w-full max-w-md h-4" />
-                    ) : null}
-                  </div>
-                  <div className="flex gap-3 shrink-0">
-                    {isOwnProfile ? (
-                      <>
-                        <ReactRouterDOM.Link to="/create-project" className="bg-white text-black hover:bg-zinc-200 px-8 py-4 rounded-xl text-[12px] font-black uppercase tracking-widest border-none cursor-pointer shadow-xl no-underline">Создать</ReactRouterDOM.Link>
-                        <button onClick={() => setIsSettingsOpen(true)} className="bg-zinc-800 hover:bg-zinc-700 text-white px-6 py-4 rounded-xl border-none cursor-pointer transition-all flex items-center justify-center">
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button className="bg-white text-black hover:bg-zinc-200 px-10 py-4 rounded-xl text-[12px] font-black uppercase tracking-widest border-none cursor-pointer shadow-xl">Подписаться</button>
-                        <button className="bg-zinc-800 hover:bg-zinc-700 text-white px-8 py-4 rounded-xl border-none text-[12px] font-black uppercase tracking-widest cursor-pointer transition-all">Написать</button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-10 border-t border-white/5">
-              {[
-                { label: 'Скачиваний', val: profileData ? '0' : <Skeleton className="w-10 h-6" /> },
-                { label: 'Проекты', val: loading ? <Skeleton className="w-10 h-6" /> : myMods.length },
-                { label: 'Лайки', val: profileData ? '0' : <Skeleton className="w-10 h-6" /> },
-                { label: 'Регистрация', val: profileData ? new Date(profileData.created_at).getFullYear() : <Skeleton className="w-10 h-6" /> }
-              ].map((stat, i) => (
-                <div key={i} className="bg-[#1a1b23] p-6 rounded-xl border border-white/[0.02]">
-                  <span className="block text-[10px] font-black text-zinc-600 uppercase tracking-widest mb-1">{stat.label}</span>
-                  <div className="flex items-end">
-                    <span className="text-2xl font-black text-zinc-300">{stat.val}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+        <ProfileHeader
+          profileData={profileData}
+          loading={loading}
+          isOwnProfile={isOwnProfile}
+          myModsCount={myMods.length}
+          bannerInputRef={bannerInputRef}
+          fileInputRef={fileInputRef}
+          handleFileSelect={handleFileSelect}
+          editingBio={editingBio}
+          localBio={localBio}
+          setLocalBio={setLocalBio}
+          handleSaveBio={handleSaveBio}
+          setEditingBio={setEditingBio}
+        />
+
+        <div className="bg-[#24262b] rounded-2xl overflow-hidden shadow-2xl mb-12 relative px-12 pb-12 pt-4">
+          <ProfileStats
+            profileData={{
+              ...profileData,
+              total_downloads: myMods.reduce((acc, mod) => acc + (mod.downloads || 0), 0),
+              total_likes: myMods.reduce((acc, mod) => acc + (mod.likes || 0), 0)
+            }}
+            loading={loading}
+            myModsCount={myMods.length}
+          />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
           <div className="lg:col-span-8">
-            <div className="flex gap-10 border-b border-white/5 mb-8">
-              {['Мои проекты', 'Избранное', ...(isOwnProfile ? ['Черновики'] : [])].map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => { setActiveTab(tab); setCurrentPage(1); }}
-                  className={`pb-4 text-[13px] font-black uppercase tracking-widest transition-all relative border-none bg-transparent cursor-pointer ${activeTab === tab ? 'text-white' : 'text-zinc-600 hover:text-zinc-400'}`}
-                >
-                  {tab}
-                  {activeTab === tab && <div className="absolute bottom-0 left-0 right-0 h-1 bg-white rounded-full"></div>}
-                </button>
-              ))}
-            </div>
-            <div className="flex flex-col sm:flex-row gap-4 mb-8">
-              <input
-                type="text"
-                placeholder="Поиск..."
-                value={searchQuery}
-                onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-                className="flex-grow bg-[#24262b] border-none py-4 px-6 rounded-xl text-sm font-bold text-white outline-none focus:bg-[#2a2c33] transition-all"
-              />
-            </div>
-            <div className="space-y-4">
-              {loading ? (
-                Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="bg-[#24262b] p-5 rounded-xl flex items-center gap-6">
-                    <Skeleton className="w-24 h-24 rounded-lg" />
-                    <div className="flex-grow space-y-3">
-                      <Skeleton className="w-20 h-3" />
-                      <Skeleton className="w-48 h-5" />
-                      <Skeleton className="w-32 h-3" />
-                    </div>
-                  </div>
-                ))
-              ) : myMods.length > 0 ? paginatedList.map((item) => (
-                <ReactRouterDOM.Link
-                  to={`/game/${item.game_slug}/project/${item.slug}`}
-                  key={item.id}
-                  className="group bg-[#24262b] p-5 rounded-xl flex items-center justify-between hover:bg-[#2a2c33] transition-all relative no-underline"
-                >
-                  <div className="flex items-center gap-6">
-                    <img src={item.img} className="w-24 h-24 bg-[#1a1b23] rounded-lg object-cover" alt="" />
-                    <div className="min-w-0">
-                      <span className="text-[10px] font-black text-zinc-600 uppercase tracking-widest truncate block">
-                        {item.game_slug} • {item.section_slug}
-                      </span>
-                      <h3 className="text-xl font-black text-zinc-100 uppercase tracking-tight m-0 truncate">
-                        {item.title}
-                      </h3>
-                      <div className="flex gap-4 mt-3 text-[11px] font-bold text-zinc-600 uppercase tracking-widest">
-                        <span>{item.downloads} downloads</span>
-                        <span>{item.likes} likes</span>
-                      </div>
-                    </div>
-                  </div>
-                  {isOwnProfile && (
-                    <div className="relative" ref={openMenuId === item.id ? menuRef : null}>
-                      <button
-                        onClick={(e) => { e.preventDefault(); setOpenMenuId(openMenuId === item.id ? null : item.id); }}
-                        className="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center text-zinc-600 hover:text-white border-none cursor-pointer transition-all"
-                      >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" /></svg>
-                      </button>
-                    </div>
-                  )}
-                </ReactRouterDOM.Link>
-              )) : (
-                <div className="py-32 text-center bg-[#24262b] rounded-xl border border-dashed border-white/5">
-                  <p className="text-zinc-600 font-black uppercase tracking-widest text-[10px]">Список пуст</p>
-                </div>
-              )}
-              <Pagination />
-            </div>
+            <ProfileTabs
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+              isOwnProfile={isOwnProfile}
+              setCurrentPage={setCurrentPage}
+            />
+            <ProjectFilters
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              filterGame={filterGame}
+              setFilterGame={setFilterGame}
+              filterCategory={filterCategory}
+              setFilterCategory={setFilterCategory}
+              uniqueGames={uniqueGames}
+              uniqueCategories={uniqueCategories}
+              activeTab={activeTab}
+              myModsLength={myMods.length}
+              setCurrentPage={setCurrentPage}
+            />
+            <ProjectList
+              loading={loading}
+              myMods={myMods}
+              paginatedList={paginatedList}
+              profileData={profileData}
+              currentPage={currentPage}
+              setCurrentPage={setCurrentPage}
+              totalPages={totalPages}
+            />
           </div>
-          <aside className="lg:col-span-4 space-y-6">
-            <div className="bg-[#24262b] rounded-xl p-8 border border-white/[0.03]">
-              <h3 className="text-zinc-600 font-black text-[10px] uppercase tracking-[0.2em] mb-6">Донаты</h3>
-              <p className="text-zinc-500 text-xs font-medium mb-6">Поддержите автора, чтобы он продолжал радовать новыми работами!</p>
-              <div className="flex flex-col gap-3">
-                <button className="flex items-center gap-4 p-4 bg-orange-500/10 rounded-xl hover:bg-orange-500 transition-all group border border-orange-500/20 cursor-pointer">
-                  <div className="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center text-white font-black text-xl shadow-lg">B</div>
-                  <span className="text-orange-500 group-hover:text-white font-black text-[12px] uppercase">Boosty</span>
-                </button>
-                <button className="flex items-center gap-4 p-4 bg-red-500/10 rounded-xl hover:bg-red-500 transition-all group border border-red-500/20 cursor-pointer">
-                  <div className="w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center text-white font-black text-xl shadow-lg">P</div>
-                  <span className="text-red-500 group-hover:text-white font-black text-[12px] uppercase">Patreon</span>
-                </button>
-              </div>
-            </div>
-          </aside>
+          <ProfileSidebar
+            profileData={profileData}
+            isOwnProfile={isOwnProfile}
+            onRemoveLink={handleRemoveLink}
+            onAddLink={handleAddLink}
+            showAddLinkForm={showAddLinkForm}
+            setShowAddLinkForm={setShowAddLinkForm}
+            newLinkUrl={newLinkUrl}
+            setNewLinkUrl={setNewLinkUrl}
+            newLinkLabel={newLinkLabel}
+            setNewLinkLabel={setNewLinkLabel}
+          />
         </div>
       </div>
 
-      {/* Интерактивный Кроппер */}
-      {isCropOpen && (
-        <div className="fixed inset-0 z-[500] flex items-center justify-center p-6 select-none overflow-hidden bg-black/98">
-          <div className="absolute inset-0" onClick={() => setIsCropOpen(false)}></div>
-          <div className="relative bg-[#1c1c21] w-full max-w-4xl rounded-[40px] overflow-hidden shadow-[0_60px_150px_rgba(0,0,0,0.9)] border border-white/5 animate-in zoom-in-95 duration-200">
-            <div className="p-8 border-b border-white/5 flex items-center justify-between bg-[#232329]">
-              <h2 className="text-2xl font-black uppercase tracking-tighter m-0 text-white/90">
-                {cropType === 'avatar' ? 'Обрезка аватара' : 'Обрезка баннера'}
-              </h2>
-              <button onClick={() => setIsCropOpen(false)} className="bg-white/5 hover:bg-white/10 text-white rounded-full w-12 h-12 flex items-center justify-center border-none cursor-pointer transition-all">
-                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            </div>
+      <ImageCropper
+        isCropOpen={isCropOpen}
+        setIsCropOpen={setIsCropOpen}
+        cropType={cropType}
+        tempImageUrl={tempImageUrl}
+        cropBox={cropBox}
+        handleMouseDown={handleMouseDown}
+        imageRef={imageRef}
+        cropperContainerRef={cropperContainerRef}
+        onImageLoad={onImageLoad}
+        saveCroppedImage={saveCroppedImage}
+      />
 
-            {/* Main Editor Area */}
-            <div className="p-0 bg-[#070708] relative flex items-center justify-center h-[550px] overflow-hidden">
-              <div ref={cropperContainerRef} className="relative inline-block border border-white/10">
-                {/* Original Image Background */}
-                <img
-                  ref={imageRef}
-                  src={tempImageUrl}
-                  onLoad={onImageLoad}
-                  className="max-h-[480px] w-auto block select-none pointer-events-none"
-                  alt="Original"
-                  onDragStart={(e) => e.preventDefault()}
-                />
-
-                {/* Darkened area (Overlay) */}
-                <div className="absolute inset-0 pointer-events-none overflow-hidden z-10">
-                  <div className="absolute top-0 left-0 right-0 bg-black/85" style={{ height: `${cropBox.y}%` }}></div>
-                  <div className="absolute bottom-0 left-0 right-0 bg-black/85" style={{ height: `${100 - cropBox.y - cropBox.height}%` }}></div>
-                  <div className="absolute left-0 bg-black/85" style={{ top: `${cropBox.y}%`, height: `${cropBox.height}%`, width: `${cropBox.x}%` }}></div>
-                  <div className="absolute right-0 bg-black/85" style={{ top: `${cropBox.y}%`, height: `${cropBox.height}%`, width: `${100 - cropBox.x - cropBox.width}%` }}></div>
-                </div>
-
-                {/* Selection Box (Hole) */}
-                <div
-                  className={`absolute cursor-move border-[4px] border-[#3b82f6] box-border shadow-[0_0_0_2px_rgba(0,0,0,0.6)] z-20 ${cropType === 'avatar' ? 'rounded-full' : ''}`}
-                  style={{ top: `${cropBox.y}%`, left: `${cropBox.x}%`, width: `${cropBox.width}%`, height: `${cropBox.height}%` }}
-                  onMouseDown={(e) => handleMouseDown(e, 'move')}
-                >
-                  {/* Visual content hole */}
-                  <div className={`w-full h-full overflow-hidden pointer-events-none relative ${cropType === 'avatar' ? 'rounded-full' : ''}`}>
-                    <img
-                      src={tempImageUrl}
-                      className="absolute max-w-none"
-                      style={{
-                        top: `-${(cropBox.y / 100) * (imageRef.current?.height || 0)}px`,
-                        left: `-${(cropBox.x / 100) * (imageRef.current?.width || 0)}px`,
-                        width: `${imageRef.current?.width}px`,
-                        height: `${imageRef.current?.height}px`
-                      }}
-                      alt=""
-                    />
-                  </div>
-
-                  {/* Corner Handles - Sharp White Squares with Blue Border */}
-                  <div className="absolute -top-4 -left-4 w-9 h-9 bg-white border-[4px] border-[#3b82f6] cursor-nw-resize z-50 shadow-2xl" onMouseDown={(e) => handleMouseDown(e, 'nw')}></div>
-                  <div className="absolute -top-4 -right-4 w-9 h-9 bg-white border-[4px] border-[#3b82f6] cursor-ne-resize z-50 shadow-2xl" onMouseDown={(e) => handleMouseDown(e, 'ne')}></div>
-                  <div className="absolute -bottom-4 -left-4 w-9 h-9 bg-white border-[4px] border-[#3b82f6] cursor-sw-resize z-50 shadow-2xl" onMouseDown={(e) => handleMouseDown(e, 'sw')}></div>
-                  <div className="absolute -bottom-4 -right-4 w-9 h-9 bg-white border-[4px] border-[#3b82f6] cursor-se-resize z-50 shadow-2xl" onMouseDown={(e) => handleMouseDown(e, 'se')}></div>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer Actions */}
-            <div className="p-8 flex justify-end gap-6 border-t border-white/5 bg-[#232329]">
-              <button onClick={() => setIsCropOpen(false)} className="bg-white/5 hover:bg-white/10 text-white px-14 py-5 rounded-2xl font-black uppercase tracking-widest text-[12px] border-none cursor-pointer transition-all active:scale-95">
-                Отмена
-              </button>
-              <button onClick={saveCroppedImage} className="bg-white text-zinc-950 hover:bg-zinc-200 px-14 py-5 rounded-2xl font-black uppercase tracking-widest text-[12px] border-none cursor-pointer transition-all active:scale-95 shadow-2xl">
-                Готово
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isSettingsOpen && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
-          <div className="absolute inset-0 bg-black/90" onClick={() => setIsSettingsOpen(false)}></div>
-          <div className="relative bg-[#24262b] w-full max-w-xl rounded-xl overflow-hidden shadow-2xl p-10 border border-white/5">
-            <div className="flex items-center justify-between mb-10">
-              <h2 className="text-2xl font-black uppercase tracking-tighter">Настройки</h2>
-              <button onClick={() => setIsSettingsOpen(false)} className="text-zinc-600 hover:text-white bg-transparent border-none cursor-pointer p-2">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            </div>
-            <form className="space-y-6" onSubmit={handleApplySettings}>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">Отображаемое имя</label>
-                <input
-                  type="text"
-                  value={profileData.display_name || ''}
-                  onChange={(e) => setProfileData({ ...profileData, display_name: e.target.value })}
-                  className="w-full bg-[#1a1b23] border-none p-4 rounded-xl text-white font-bold outline-none"
-                  placeholder={profileData.username}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">О себе</label>
-                <textarea
-                  rows={3}
-                  value={profileData.bio || ''}
-                  onChange={(e) => setProfileData({ ...profileData, bio: e.target.value })}
-                  className="w-full bg-[#1a1b23] border-none p-4 rounded-xl text-white font-medium outline-none resize-none"
-                />
-              </div>
-              <button type="submit" className="w-full bg-white text-black font-black py-4 rounded-xl uppercase tracking-widest text-[11px] border-none cursor-pointer">Применить</button>
-            </form>
-          </div>
-        </div>
-      )}
+      <ProfileSettingsModal
+        isSettingsOpen={isSettingsOpen}
+        setIsSettingsOpen={setIsSettingsOpen}
+        profileData={profileData}
+        setProfileData={setProfileData}
+        handleApplySettings={handleApplySettings}
+      />
     </div>
   );
 };

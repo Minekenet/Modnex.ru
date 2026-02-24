@@ -3,9 +3,11 @@ import { ItemService } from '../services/items';
 import { GameService } from '../services/games';
 import { createItemSchema } from '../schemas/items';
 
+const viewCache = new Set<string>();
 
 export default async function itemsRoutes(server: FastifyInstance) {
-    const itemService = new ItemService(server.pg);
+    const publicUrlBase = `${process.env.S3_PUBLIC_ENDPOINT || 'http://localhost:9000'}/${process.env.S3_BUCKET || 'modnex-files'}`;
+    const itemService = new ItemService(server.pg, publicUrlBase);
     const gameService = new GameService(server.pg);
 
     // List Items (Catalog)
@@ -33,6 +35,15 @@ export default async function itemsRoutes(server: FastifyInstance) {
         try {
             const item = await itemService.findBySlug(game_slug, section_slug, item_slug);
             if (!item) return reply.code(404).send({ error: 'Item not found' });
+
+            const ip = request.ip || 'unknown';
+            const cacheKey = `view_${item.id}_${ip}`;
+            if (!viewCache.has(cacheKey)) {
+                viewCache.add(cacheKey);
+                setTimeout(() => viewCache.delete(cacheKey), 10 * 60 * 1000);
+                server.pg.query("UPDATE items SET stats = jsonb_set(stats, '{views}', (COALESCE((stats->>'views')::int, 0) + 1)::text::jsonb) WHERE id = $1", [item.id]).catch(err => server.log.error(err));
+            }
+
             return item;
         } catch (err) {
             server.log.error(err);
@@ -117,6 +128,50 @@ export default async function itemsRoutes(server: FastifyInstance) {
             const updated = await itemService.updateStatus(item.id, user.id, status);
             if (!updated) return reply.code(400).send({ error: 'Invalid status' });
             return updated;
+        } catch (err) {
+            server.log.error(err);
+            return reply.code(500).send({ error: 'Internal Server Error' });
+        }
+    });
+
+    server.get('/items/:item_id/like', {
+        onRequest: [async (request) => await request.jwtVerify()]
+    }, async (request, reply) => {
+        const { item_id } = request.params as any;
+        const user = request.user as any;
+        try {
+            const { rows } = await server.pg.query("SELECT 1 FROM item_likes WHERE item_id = $1 AND user_id = $2", [item_id, user.id]);
+            return { is_liked: rows.length > 0 };
+        } catch (err) {
+            server.log.error(err);
+            return reply.code(500).send({ error: 'Internal Server Error' });
+        }
+    });
+
+    server.post('/items/:item_id/like', {
+        onRequest: [async (request) => await request.jwtVerify()]
+    }, async (request, reply) => {
+        const { item_id } = request.params as any;
+        const user = request.user as any;
+        try {
+            await server.pg.query("INSERT INTO item_likes (item_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", [item_id, user.id]);
+            await server.pg.query("UPDATE items SET stats = jsonb_set(stats, '{likes}', (SELECT COUNT(*) FROM item_likes WHERE item_id = $1)::text::jsonb) WHERE id = $1", [item_id]);
+            return { success: true };
+        } catch (err) {
+            server.log.error(err);
+            return reply.code(500).send({ error: 'Internal Server Error' });
+        }
+    });
+
+    server.delete('/items/:item_id/like', {
+        onRequest: [async (request) => await request.jwtVerify()]
+    }, async (request, reply) => {
+        const { item_id } = request.params as any;
+        const user = request.user as any;
+        try {
+            await server.pg.query("DELETE FROM item_likes WHERE item_id = $1 AND user_id = $2", [item_id, user.id]);
+            await server.pg.query("UPDATE items SET stats = jsonb_set(stats, '{likes}', (SELECT COUNT(*) FROM item_likes WHERE item_id = $1)::text::jsonb) WHERE id = $1", [item_id]);
+            return { success: true };
         } catch (err) {
             server.log.error(err);
             return reply.code(500).send({ error: 'Internal Server Error' });

@@ -5,6 +5,7 @@ import * as ReactRouterDOM from 'react-router-dom';
 type AuthMode = 'login' | 'register' | 'forgot-password' | 'verify-code' | 'new-password';
 
 import { authService } from '../api/auth';
+import { useAuthStore } from '../stores/authStore';
 
 const AuthPage: React.FC = () => {
   const [mode, setMode] = useState<AuthMode>('login');
@@ -17,6 +18,7 @@ const AuthPage: React.FC = () => {
   const navigate = ReactRouterDOM.useNavigate();
   const [searchParams] = ReactRouterDOM.useSearchParams();
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const { login } = useAuthStore();
 
   React.useEffect(() => {
     const token = searchParams.get('token');
@@ -24,8 +26,11 @@ const AuthPage: React.FC = () => {
     const errorParam = searchParams.get('error');
 
     if (token && user) {
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', user);
+      try {
+        login(token, JSON.parse(decodeURIComponent(user)));
+      } catch (err) {
+        login(token, JSON.parse(user));
+      }
       navigate('/profile');
     }
     if (errorParam) {
@@ -64,6 +69,7 @@ const AuthPage: React.FC = () => {
           startTimer();
           return;
         }
+        login(res.token, res.user);
         navigate('/profile');
       } else if (mode === 'register') {
         const res = await authService.register(formData.username, formData.email, formData.password);
@@ -72,7 +78,8 @@ const AuthPage: React.FC = () => {
         startTimer();
       } else if (mode === 'verify-code') {
         const code = verificationCode.join('');
-        await authService.verify(formData.email, code);
+        const res = await authService.verify(formData.email, code);
+        login(res.token, res.user);
         navigate('/profile');
       }
     } catch (err: any) {

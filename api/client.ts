@@ -20,4 +20,15 @@ api.interceptors.request.use(
     }
 );
 
+api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response?.status === 404 && error.config.url?.includes('/users/')) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+        }
+        return Promise.reject(error);
+    }
+);
+
 export default api;

@@ -7,10 +7,25 @@ export class GameService {
         this.db = db;
     }
 
-    async findAll() {
-        const query = 'SELECT * FROM games ORDER BY title ASC';
-        const { rows } = await this.db.query(query);
-        return rows;
+    async findAll(filters: { q?: string } = {}) {
+        let query = `
+            SELECT g.*,
+                (SELECT COUNT(*)::int FROM items i JOIN sections s ON i.section_id = s.id WHERE s.game_id = g.id AND i.status = 'published') as mod_count,
+                (SELECT COALESCE(SUM(f.download_count), 0)::int FROM files f JOIN items i ON f.item_id = i.id JOIN sections s ON i.section_id = s.id WHERE s.game_id = g.id) as download_count
+            FROM games g
+        `;
+        const params: any[] = [];
+        if (filters.q) {
+            query += ' WHERE g.title ILIKE $1';
+            params.push(`%${filters.q}%`);
+        }
+        query += ' ORDER BY g.title ASC';
+        const { rows } = await this.db.query(query, params);
+        return rows.map((r: any) => ({
+            ...r,
+            modCount: String(r.mod_count ?? 0),
+            downloadCount: String(r.download_count ?? 0)
+        }));
     }
 
     async findBySlug(slug: string) {

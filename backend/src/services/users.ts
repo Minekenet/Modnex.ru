@@ -67,7 +67,7 @@ export class UserService {
         return rows[0];
     }
 
-    async update(userId: string, data: { display_name?: string; bio?: string; avatar_url?: string; banner_url?: string }) {
+    async update(userId: string, data: { display_name?: string; bio?: string; avatar_url?: string; banner_url?: string; links?: any }) {
         const fields: string[] = [];
         const params: any[] = [userId];
         let paramIndex = 2;
@@ -90,6 +90,54 @@ export class UserService {
         `;
         const { rows } = await this.db.query(query, params);
         return rows[0];
+    }
+
+    async isUsernameAvailable(username: string, excludeUserId?: string): Promise<boolean> {
+        let query = 'SELECT id FROM users WHERE LOWER(username) = LOWER($1)';
+        const params: any[] = [username];
+        if (excludeUserId) {
+            query += ' AND id != $2';
+            params.push(excludeUserId);
+        }
+        const { rows } = await this.db.query(query, params);
+        return rows.length === 0;
+    }
+
+    async updateUsername(userId: string, username: string) {
+        const query = `
+            UPDATE users SET username = $2 WHERE id = $1
+            RETURNING id, username, display_name, email, role, avatar_url, banner_url, bio, links
+        `;
+        const { rows } = await this.db.query(query, [userId, username]);
+        return rows[0];
+    }
+
+    async updateEmail(userId: string, email: string) {
+        const query = `
+            UPDATE users SET email = $2 WHERE id = $1
+            RETURNING id, username, display_name, email, role, avatar_url, banner_url, bio, links
+        `;
+        const { rows } = await this.db.query(query, [userId, email]);
+        return rows[0];
+    }
+
+    async updatePassword(userId: string, newPassword: string) {
+        const passwordHash = await bcrypt.hash(newPassword, 10);
+        const query = 'UPDATE users SET password_hash = $2 WHERE id = $1';
+        await this.db.query(query, [userId, passwordHash]);
+        return { success: true };
+    }
+
+    async findById(userId: string) {
+        const query = 'SELECT * FROM users WHERE id = $1';
+        const { rows } = await this.db.query(query, [userId]);
+        return rows[0];
+    }
+
+    async deleteAccount(userId: string) {
+        const query = 'DELETE FROM users WHERE id = $1';
+        await this.db.query(query, [userId]);
+        return { success: true };
     }
 
     async findByEmail(email: string) {
@@ -127,21 +175,29 @@ export class UserService {
         const dbGameIds = dbFavsResult.rows.map((r: any) => r.game_id);
 
         // Union: combine DB and local favorites, remove duplicates
-        const allGameIds = [...new Set([...dbGameIds, ...localGameIds])];
+        const requestedGameIds = [...new Set([...dbGameIds, ...localGameIds])];
 
-        // Insert missing favorites (ON CONFLICT handles duplicates)
-        if (allGameIds.length > dbGameIds.length) {
-            const newGameIds = allGameIds.filter(id => !dbGameIds.includes(id));
-            if (newGameIds.length > 0) {
-                const values = newGameIds.map((_, idx) => `($1, $${idx + 2})`).join(', ');
-                const params = [userId, ...newGameIds];
-                const insertQuery = `
-                    INSERT INTO user_favorite_games (user_id, game_id)
-                    VALUES ${values}
-                    ON CONFLICT DO NOTHING
-                `;
-                await this.db.query(insertQuery, params);
-            }
+        // Filter: only keep IDs that exist in the games table
+        let allGameIds = requestedGameIds;
+        if (localGameIds.length > 0) {
+            const checkQuery = `SELECT id FROM games WHERE id = ANY($1)`;
+            const checkResult = await this.db.query(checkQuery, [requestedGameIds]);
+            allGameIds = checkResult.rows.map((r: any) => r.id);
+        }
+
+        // Insert missing favorites
+        const existingInDb = new Set(dbGameIds);
+        const newGameIds = allGameIds.filter(id => !existingInDb.has(id));
+
+        if (newGameIds.length > 0) {
+            const values = newGameIds.map((_, idx) => `($1, $${idx + 2})`).join(', ');
+            const params = [userId, ...newGameIds];
+            const insertQuery = `
+                INSERT INTO user_favorite_games (user_id, game_id)
+                VALUES ${values}
+                ON CONFLICT DO NOTHING
+            `;
+            await this.db.query(insertQuery, params);
         }
 
         // Return merged list

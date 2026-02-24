@@ -4,6 +4,7 @@ import ReactDOM from 'react-dom/client';
 // Use namespace import to resolve missing named exports in some environments
 import * as ReactRouterDOM from 'react-router-dom';
 import App from './App';
+import './index.css';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

@@ -66,7 +66,13 @@ const Hero: React.FC = () => {
       setSearchSuccess(false);
       try {
         const results = await gamesService.getAll({ q: searchQuery });
-        setFilteredGames(results.slice(0, 5));
+        const mapped = results.slice(0, 5).map((g: any) => ({
+          ...g,
+          imageUrl: g.cover_url || g.imageUrl || '',
+          modCount: g.modCount ?? g.mod_count ?? '0',
+          downloadCount: g.downloadCount ?? g.download_count ?? '0'
+        }));
+        setFilteredGames(mapped);
         setSearchSuccess(true);
       } catch (err) {
         console.error('Search failed:', err);

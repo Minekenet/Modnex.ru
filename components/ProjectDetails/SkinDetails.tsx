@@ -123,8 +123,8 @@ export const SkinDetails: React.FC<SkinDetailsProps> = ({
                         createdAt={modData.created_at}
                         updatedAt={modData.updated_at}
                     />
-                    <SidebarCreators authorName={modData.author_name} />
-                    <SidebarLinks />
+                    <SidebarCreators authorName={modData.author_name} authorAvatar={modData.author_avatar} />
+                    <SidebarLinks links={modData.links} />
                 </div>
             </div>
         </div>

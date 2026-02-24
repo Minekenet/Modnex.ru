@@ -13,12 +13,13 @@ export class FileService {
     async uploadVersion(itemId: string, versionNumber: string, file: any, changelog?: string, extraData?: Record<string, string>) {
         const key = `items/${itemId}/${versionNumber}/${file.filename}`;
         const fileBody = file.file || file;
-        await this.storage.uploadFile(key, fileBody, file.mimetype);
+        const { url, size } = await this.storage.uploadFile(key, fileBody, file.mimetype);
 
         const fileData: Record<string, any> = {
             filename: file.filename,
             mimetype: file.mimetype,
             encoding: file.encoding,
+            size: size,
             ...(extraData || {})
         };
 
@@ -65,7 +66,7 @@ export class FileService {
         // 1. Upload to S3
         const key = `gallery/${itemId}/${Date.now()}_${file.filename}`;
         const fileBody = file.file || file;
-        await this.storage.uploadFile(key, fileBody, file.mimetype);
+        const { url } = await this.storage.uploadFile(key, fileBody, file.mimetype);
 
         // 2. Save to Database
         const query = `
@@ -76,4 +77,5 @@ export class FileService {
         const { rows } = await this.db.query(query, [itemId, key, isPrimary]);
         return rows[0];
     }
+
 }

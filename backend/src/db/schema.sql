@@ -81,6 +81,14 @@ CREATE TABLE IF NOT EXISTS item_gallery (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Item Likes Table
+CREATE TABLE IF NOT EXISTS item_likes (
+    item_id UUID REFERENCES items(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY(item_id, user_id)
+);
+
 -- Indexes for Performance
 CREATE INDEX IF NOT EXISTS idx_items_attributes ON items USING GIN (attributes);
 CREATE INDEX IF NOT EXISTS idx_items_section_id ON items(section_id);

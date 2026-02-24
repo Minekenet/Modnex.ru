@@ -1,11 +1,13 @@
 import { FastifyInstance } from 'fastify';
 import bcrypt from 'bcryptjs';
 import { UserService } from '../services/users';
+import { registerSchema, loginSchema, verifySchema } from '../schemas/auth';
+
 
 export default async function authRoutes(server: FastifyInstance) {
     const userService = new UserService(server.pg);
 
-    server.post('/auth/register', async (request, reply) => {
+    server.post('/auth/register', { schema: registerSchema }, async (request, reply) => {
         const { username, email, password } = request.body as any;
 
         if (!username || !email || !password) {
@@ -31,7 +33,7 @@ export default async function authRoutes(server: FastifyInstance) {
         }
     });
 
-    server.post('/auth/verify', async (request, reply) => {
+    server.post('/auth/verify', { schema: verifySchema }, async (request, reply) => {
         const { email, code } = request.body as any;
         if (!email || !code) {
             return reply.code(400).send({ error: 'Email and code are required' });
@@ -46,7 +48,7 @@ export default async function authRoutes(server: FastifyInstance) {
         return { user, token };
     });
 
-    server.post('/auth/login', async (request, reply) => {
+    server.post('/auth/login', { schema: loginSchema }, async (request, reply) => {
         const { email, password } = request.body as any;
 
         if (!email || !password) {
@@ -72,8 +74,13 @@ export default async function authRoutes(server: FastifyInstance) {
             user: {
                 id: user.id,
                 username: user.username,
+                display_name: user.display_name,
                 email: user.email,
-                role: user.role
+                role: user.role,
+                avatar_url: user.avatar_url,
+                banner_url: user.banner_url,
+                bio: user.bio,
+                links: user.links
             },
             token
         };
@@ -211,7 +218,8 @@ export default async function authRoutes(server: FastifyInstance) {
     }, async (request, reply) => {
         const decoded = request.user as any;
         // Fetch full user data to ensure we have latest info
-        const { rows } = await server.pg.query('SELECT id, username, email, role, avatar_url FROM users WHERE id = $1', [decoded.id]);
+        const { rows } = await server.pg.query('SELECT id, username, display_name, email, role, avatar_url, banner_url, bio, links FROM users WHERE id = $1', [decoded.id]);
+        if (!rows[0]) return reply.code(404).send({ error: 'User not found' });
         return rows[0];
     });
 }
